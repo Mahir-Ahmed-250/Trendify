@@ -206,8 +206,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const defaultSuperAdmin: AdminUser = {
     id: 'super_admin_id',
-    email: 'admin@tbari.com',
-    password: 'admin123',
+    email: 'xahin.mahir@gmail.com',
+    password: '123456',
     role: 'super',
     permissions: {
       dashboard: true,
