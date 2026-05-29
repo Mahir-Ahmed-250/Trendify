@@ -204,26 +204,26 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : defaultHomeAds;
   });
 
-  const defaultSuperAdmin: AdminUser = {
-    id: 'super_admin_id',
-    email: 'admin@tbari.com',
-    password: 'admin123',
-    role: 'super',
-    permissions: {
-      dashboard: true,
-      products: true,
-      orders: true,
-      coupons: true,
-      slides: true,
-      categories: true,
-      lookbook: true,
-      subscribers: true,
-      messages: true,
-      ads: true,
-      faqs: true,
-      policies: true
-    }
-  };
+  // const defaultSuperAdmin: AdminUser = {
+  //   id: 'super_admin_id',
+  //   email: 'admin@tbari.com',
+  //   password: 'admin123',
+  //   role: 'super',
+  //   permissions: {
+  //     dashboard: true,
+  //     products: true,
+  //     orders: true,
+  //     coupons: true,
+  //     slides: true,
+  //     categories: true,
+  //     lookbook: true,
+  //     subscribers: true,
+  //     messages: true,
+  //     ads: true,
+  //     faqs: true,
+  //     policies: true
+  //   }
+  // };
 
   const [admins, setAdmins] = useState<AdminUser[]>(() => {
     const saved = localStorage.getItem('ts_admins');
