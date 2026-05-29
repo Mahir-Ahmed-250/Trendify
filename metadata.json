@@ -1,0 +1,8 @@
+{
+  "name": "T-Shirt Store",
+  "description": "An e-commerce website for selling T-shirts with an admin panel and guest checkout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
