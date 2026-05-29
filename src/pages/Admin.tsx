@@ -1025,10 +1025,10 @@ export default function AdminDashboard() {
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="mt-4 w-16 h-16 rounded-full border-2 border-gray-100 p-0.5 overflow-hidden shadow-sm"
+                  className="mt-4 w-36 h-36 rounded-full border-2 border-gray-100 p-0.5 overflow-hidden shadow-sm"
                 >
                   {currentAdmin?.image ? (
-                    <img src={currentAdmin.image} alt="Admin" className="w-full h-full object-cover rounded-full" />
+                    <img src={currentAdmin.image} alt="Admin"  className="w-full h-full object-cover rounded-full" />
                   ) : (
                     <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-300">
                       <UserCircle className="w-8 h-8" />

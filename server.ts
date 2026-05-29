@@ -181,30 +181,26 @@ async function writeDbKey(key: string, data: any): Promise<boolean> {
     if (mongo) {
       try {
         const col = mongo.collection(key);
-        // Clean target collection for pristine, error-free sync
-        await col.deleteMany({});
-        
         const array = Array.isArray(data) ? data : [];
         if (array.length > 0) {
-          // De-duplicate items by id to ensure absolute uniqueness inside the array
-          const seenIds = new Set<string>();
-          const uniqueDocs: any[] = [];
-          
+          // Upsert items by id to ensure absolute uniqueness inside the array without deleting
           for (const item of array) {
             if (!item || typeof item !== "object") continue;
-            const itemId = item.id || item.email || String(Math.random());
-            if (!seenIds.has(itemId)) {
-              seenIds.add(itemId);
-              const doc = { ...item };
-              if (item.id) {
-                doc._id = item.id;
-              }
-              uniqueDocs.push(doc);
+            const itemId = item.id || item.email || item._id || String(Math.random());
+            const doc = { ...item };
+            if (item.id) {
+              doc._id = item.id;
+            } else if (!doc._id) {
+              doc._id = itemId;
             }
-          }
-          
-          if (uniqueDocs.length > 0) {
-            await col.insertMany(uniqueDocs);
+            
+            // Do NOT use deleteMany, just upsert to never remove data
+            const filter = { _id: doc._id };
+            // Optional: remove the _id from $set payload to prevent Mongo immutable field errors if it differs
+            const setPayload = { ...doc };
+            delete setPayload._id;
+            
+            await col.updateOne(filter, { $set: setPayload }, { upsert: true });
           }
         }
         return true;
