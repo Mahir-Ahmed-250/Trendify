@@ -316,75 +316,38 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchDb();
   }, []);
 
-  // Persist state
-  useEffect(() => { 
-    localStorage.setItem('ts_products', JSON.stringify(products)); 
-    if (isDbLoaded) serverSave('products', products);
-  }, [products, isDbLoaded]);
+  // Custom hook to prevent syncing on the first load of isDbLoaded
+  function useServerSync(key: string, data: any, storageKey: string) {
+    const isFirstMount = React.useRef(true);
+    useEffect(() => {
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      if (isDbLoaded) {
+        if (isFirstMount.current) {
+          isFirstMount.current = false;
+        } else {
+          serverSave(key, data);
+        }
+      }
+    }, [data, isDbLoaded, key, storageKey]);
+  }
 
-  useEffect(() => { 
-    localStorage.setItem('ts_orders', JSON.stringify(orders)); 
-    if (isDbLoaded) serverSave('orders', orders);
-  }, [orders, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_coupons', JSON.stringify(coupons)); 
-    if (isDbLoaded) serverSave('coupons', coupons);
-  }, [coupons, isDbLoaded]);
+  useServerSync('products', products, 'ts_products');
+  useServerSync('orders', orders, 'ts_orders');
+  useServerSync('coupons', coupons, 'ts_coupons');
+  useServerSync('slides', slides, 'ts_slides');
+  useServerSync('categoryBanners', categoryBanners, 'ts_category_banners');
+  useServerSync('lookbook', lookbook, 'ts_lookbook');
+  useServerSync('subscribers', subscribers, 'ts_subscribers');
+  useServerSync('contactMessages', contactMessages, 'ts_contact_msgs');
+  useServerSync('popupAds', popupAds, 'ts_popup_ads');
+  useServerSync('homeAds', homeAds, 'ts_home_ads');
+  useServerSync('faqs', faqs, 'ts_faqs');
+  useServerSync('policies', policies, 'ts_policies');
+  useServerSync('admins', admins, 'ts_admins');
 
   useEffect(() => { 
     localStorage.setItem('ts_cart', JSON.stringify(cart)); 
   }, [cart]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_slides', JSON.stringify(slides)); 
-    if (isDbLoaded) serverSave('slides', slides);
-  }, [slides, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_category_banners', JSON.stringify(categoryBanners)); 
-    if (isDbLoaded) serverSave('categoryBanners', categoryBanners);
-  }, [categoryBanners, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_lookbook', JSON.stringify(lookbook)); 
-    if (isDbLoaded) serverSave('lookbook', lookbook);
-  }, [lookbook, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_subscribers', JSON.stringify(subscribers)); 
-    if (isDbLoaded) serverSave('subscribers', subscribers);
-  }, [subscribers, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_contact_msgs', JSON.stringify(contactMessages)); 
-    if (isDbLoaded) serverSave('contactMessages', contactMessages);
-  }, [contactMessages, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_popup_ads', JSON.stringify(popupAds)); 
-    if (isDbLoaded) serverSave('popupAds', popupAds);
-  }, [popupAds, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_home_ads', JSON.stringify(homeAds)); 
-    if (isDbLoaded) serverSave('homeAds', homeAds);
-  }, [homeAds, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_faqs', JSON.stringify(faqs)); 
-    if (isDbLoaded) serverSave('faqs', faqs);
-  }, [faqs, isDbLoaded]);
-
-  useEffect(() => { 
-    localStorage.setItem('ts_policies', JSON.stringify(policies)); 
-    if (isDbLoaded) serverSave('policies', policies);
-  }, [policies, isDbLoaded]);
-  
-  useEffect(() => {
-    localStorage.setItem('ts_admins', JSON.stringify(admins));
-    if (isDbLoaded) serverSave('admins', admins);
-  }, [admins, isDbLoaded]);
 
   useEffect(() => {
     if (currentAdmin) {
