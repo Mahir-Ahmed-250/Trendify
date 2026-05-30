@@ -419,7 +419,7 @@ function AdminOTPView() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tight">Track Order OTPs 🔑</h1>
-          <p className="text-xs text-gray-500 font-medium">ইউজারদের ইমেইল ও মোবাইল নম্বরে পাঠানো সকল OTP কোড এবং এর বর্তমান অবস্থা এখানে দেখতে পাবেন। কোনো ইউজারের কোড না গেলে এখান থেকে নিয়ে বলতে পারবেন।</p>
+         
         </div>
         <div className="relative w-full md:w-80">
           <input
@@ -751,6 +751,18 @@ export default function AdminDashboard() {
   const changeTab = (tab: typeof activeTab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Reset order search and filters when switching tabs to ensure freshness
+    setOrderSearchQuery('');
+    setAppliedOrderQuery('');
+    setOrderDateRange('');
+    setAppliedOrderDateRange('');
+    setOrderDateFilter('all');
+    setAppliedOrderDateFilter('all');
+    setOrderStatusFilter('all');
+    setAppliedOrderStatusFilter('all');
+    setOrdersPage(1);
+    setIsSearchingOrders(false);
   };
   const today = new Date().toDateString();
   const todaysNewOrders = orders.filter(o => new Date(o.date).toDateString() === today).length;
@@ -1160,7 +1172,9 @@ export default function AdminDashboard() {
     policies: true,
     otps: false,
     otpsDelete: false,
-    activityLogs: false
+    activityLogs: false,
+    reviews: true,
+    notifications: true
   });
 
   // Auto-routing for general admin depending on permissions
@@ -1972,305 +1986,307 @@ export default function AdminDashboard() {
           </button>
 
           {/* Premium Notification Center */}
-          <div className="relative">
-            {/* Notification Bell Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsNotifOpen(!isNotifOpen)}
-              className={`relative p-3 rounded-xl border transition-all flex items-center justify-center ${
-                isNotifOpen 
-                  ? 'bg-black text-white border-black dark:bg-white dark:text-black dark:border-white shadow-md' 
-                  : 'bg-white dark:bg-gray-950 text-gray-750 dark:text-gray-300 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-black dark:hover:text-white shadow-sm'
-              }`}
-            >
-              <Bell className="h-[18px] w-[18px]" />
-              {/* Glowing Indicator Badge - Green for New/Pending Orders, Red for Low Stock Alerts, Blue for Reviews */}
-              {(unreadPendingOrders.length + lowStockProducts.length + unreadPendingReviews.length) > 0 && (
-                <span className={`absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full text-[9px] font-black text-white border border-white dark:border-gray-900 animate-pulse ${
-                  unreadPendingOrders.length > 0 ? 'bg-green-600' : (unreadPendingReviews.length > 0 ? 'bg-blue-600' : 'bg-red-600')
-                }`}>
-                  {unreadPendingOrders.length + lowStockProducts.length + unreadPendingReviews.length}
-                </span>
-              )}
-            </motion.button>
-
-            {/* Notification Dropdown Panel */}
-            <AnimatePresence>
-              {isNotifOpen && (
-                <>
-                  {/* Overlay Click-Away Trap */}
-                  <div className="fixed inset-0 z-30 pointer-events-auto" onClick={() => setIsNotifOpen(false)} />
-                  
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-3 w-80 sm:w-96 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl shadow-xl z-40 overflow-hidden text-left"
-                  >
-                    {/* Header */}
-                    <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-black text-xs uppercase tracking-widest text-gray-900 dark:text-white">Notification Center</h3>
-                        <p className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-wider">অ্যালার্ট ও নোটিফিকেশন</p>
+          {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.notifications) && (
+            <div className="relative">
+              {/* Notification Bell Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className={`relative p-3 rounded-xl border transition-all flex items-center justify-center ${
+                  isNotifOpen 
+                    ? 'bg-black text-white border-black dark:bg-white dark:text-black dark:border-white shadow-md' 
+                    : 'bg-white dark:bg-gray-950 text-gray-750 dark:text-gray-300 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-black dark:hover:text-white shadow-sm'
+                }`}
+              >
+                <Bell className="h-[18px] w-[18px]" />
+                {/* Glowing Indicator Badge - Green for New/Pending Orders, Red for Low Stock Alerts, Blue for Reviews */}
+                {(unreadPendingOrders.length + lowStockProducts.length + unreadPendingReviews.length) > 0 && (
+                  <span className={`absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full text-[9px] font-black text-white border border-white dark:border-gray-900 animate-pulse ${
+                    unreadPendingOrders.length > 0 ? 'bg-green-600' : (unreadPendingReviews.length > 0 ? 'bg-blue-600' : 'bg-red-600')
+                  }`}>
+                    {unreadPendingOrders.length + lowStockProducts.length + unreadPendingReviews.length}
+                  </span>
+                )}
+              </motion.button>
+  
+              {/* Notification Dropdown Panel */}
+              <AnimatePresence>
+                {isNotifOpen && (
+                  <>
+                    {/* Overlay Click-Away Trap */}
+                    <div className="fixed inset-0 z-30 pointer-events-auto" onClick={() => setIsNotifOpen(false)} />
+                    
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-3 w-80 sm:w-96 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl shadow-xl z-40 overflow-hidden text-left"
+                    >
+                      {/* Header */}
+                      <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                        <div>
+                          <h3 className="font-black text-xs uppercase tracking-widest text-gray-900 dark:text-white">Notification Center</h3>
+                          <p className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-wider">অ্যালার্ট ও নোটিফিকেশন</p>
+                        </div>
+                        
+                        {/* Subtitle / Mark All */}
+                        {notifTab === 'orders' && unreadPendingOrders.length > 0 && (
+                          <button 
+                            onClick={() => {
+                              const unreadIds = pendingOrders.filter(o => !readOrderIds.includes(o.id)).map(o => o.id);
+                              setReadOrderIds(prev => [...prev, ...unreadIds]);
+                            }}
+                            className="text-[10px] font-black uppercase text-gray-500 hover:text-black dark:hover:text-white tracking-wider bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors border border-gray-100 dark:border-gray-700"
+                          >
+                            Mark All Read
+                          </button>
+                        )}
+  
+                        {notifTab === 'reviews' && unreadPendingReviews.length > 0 && (
+                          <button 
+                            onClick={() => {
+                              const unreadIds = pendingReviews.filter(r => !readReviewIds.includes(r.id)).map(r => r.id);
+                              setReadReviewIds(prev => [...prev, ...unreadIds]);
+                            }}
+                            className="text-[10px] font-black uppercase text-gray-500 hover:text-black dark:hover:text-white tracking-wider bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors border border-gray-100 dark:border-gray-700"
+                          >
+                            Mark All Read
+                          </button>
+                        )}
                       </div>
-                      
-                      {/* Subtitle / Mark All */}
-                      {notifTab === 'orders' && unreadPendingOrders.length > 0 && (
-                        <button 
-                          onClick={() => {
-                            const unreadIds = pendingOrders.filter(o => !readOrderIds.includes(o.id)).map(o => o.id);
-                            setReadOrderIds(prev => [...prev, ...unreadIds]);
-                          }}
-                          className="text-[10px] font-black uppercase text-gray-500 hover:text-black dark:hover:text-white tracking-wider bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors border border-gray-100 dark:border-gray-700"
+  
+                      {/* Navigation Tabs */}
+                      <div className="flex border-b border-gray-100 dark:border-gray-800 text-xs font-black uppercase tracking-wider bg-gray-50/50 dark:bg-gray-900/50">
+                        <button
+                          onClick={() => setNotifTab('orders')}
+                          className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+                            notifTab === 'orders'
+                              ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white bg-white dark:bg-gray-950/40 font-black'
+                              : 'border-transparent text-gray-400 hover:text-gray-900'
+                          }`}
                         >
-                          Mark All Read
+                          New Orders 
+                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                            unreadPendingOrders.length > 0 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' 
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
+                          }`}>
+                            {unreadPendingOrders.length}
+                          </span>
                         </button>
-                      )}
-
-                      {notifTab === 'reviews' && unreadPendingReviews.length > 0 && (
-                        <button 
-                          onClick={() => {
-                            const unreadIds = pendingReviews.filter(r => !readReviewIds.includes(r.id)).map(r => r.id);
-                            setReadReviewIds(prev => [...prev, ...unreadIds]);
-                          }}
-                          className="text-[10px] font-black uppercase text-gray-500 hover:text-black dark:hover:text-white tracking-wider bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors border border-gray-100 dark:border-gray-700"
+  
+                        <button
+                          onClick={() => setNotifTab('reviews')}
+                          className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+                            notifTab === 'reviews'
+                              ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white bg-white dark:bg-gray-950/40 font-black'
+                              : 'border-transparent text-gray-400 hover:text-gray-900'
+                          }`}
                         >
-                          Mark All Read
+                          Reviews 
+                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                            unreadPendingReviews.length > 0 
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' 
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
+                          }`}>
+                            {unreadPendingReviews.length}
+                          </span>
                         </button>
-                      )}
-                    </div>
-
-                    {/* Navigation Tabs */}
-                    <div className="flex border-b border-gray-100 dark:border-gray-800 text-xs font-black uppercase tracking-wider bg-gray-50/50 dark:bg-gray-900/50">
-                      <button
-                        onClick={() => setNotifTab('orders')}
-                        className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-                          notifTab === 'orders'
-                            ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white bg-white dark:bg-gray-950/40 font-black'
-                            : 'border-transparent text-gray-400 hover:text-gray-900'
-                        }`}
-                      >
-                        New Orders 
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
-                          unreadPendingOrders.length > 0 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' 
-                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
-                        }`}>
-                          {unreadPendingOrders.length}
-                        </span>
-                      </button>
-
-                      <button
-                        onClick={() => setNotifTab('reviews')}
-                        className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-                          notifTab === 'reviews'
-                            ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white bg-white dark:bg-gray-950/40 font-black'
-                            : 'border-transparent text-gray-400 hover:text-gray-900'
-                        }`}
-                      >
-                        Reviews 
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
-                          unreadPendingReviews.length > 0 
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' 
-                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
-                        }`}>
-                          {unreadPendingReviews.length}
-                        </span>
-                      </button>
-                      
-                      <button
-                        onClick={() => setNotifTab('stock')}
-                        className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-                          notifTab === 'stock'
-                            ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white bg-white dark:bg-gray-950/40 font-black'
-                            : 'border-transparent text-gray-400 hover:text-gray-900'
-                        }`}
-                      >
-                        Stock Alerts
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
-                          lowStockProducts.length > 0 
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' 
-                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
-                        }`}>
-                          {lowStockProducts.length}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Scrollable Content Container */}
-                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 p-2">
-                      {/* TAB 1: NEW/PENDING ORDERS */}
-                      {notifTab === 'orders' && (
-                        <>
-                          {pendingOrders.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
-                              <ShoppingBag className="h-8 w-8 opacity-20" />
-                              <p className="font-bold uppercase tracking-wider text-[10px]">সব অর্ডার প্রসেস করা হয়েছে! 🎉</p>
-                              <p className="text-[9px] opacity-70">No pending orders waiting for you.</p>
-                            </div>
-                          ) : (
-                            pendingOrders.map(order => {
-                              const isUnread = !readOrderIds.includes(order.id);
-                              return (
-                                <div 
-                                  key={order.id}
-                                  onClick={() => {
-                                    if (isUnread) {
-                                      setReadOrderIds(prev => [...prev, order.id]);
-                                    }
-                                    setOrderSearchQuery(order.id);
-                                    setAppliedOrderQuery(order.id);
-                                    setOrderStatusFilter('all');
-                                    setAppliedOrderStatusFilter('all');
-                                    setSelectedOrderForView(order);
-                                    setActiveTab('orders');
-                                    setIsNotifOpen(false);
-                                  }}
-                                  className={`p-3.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-all flex justify-between items-center gap-3 border ${
-                                    isUnread 
-                                      ? 'bg-green-50/40 border-green-150 dark:bg-green-950/10 dark:border-green-900/30' 
-                                      : 'border-transparent bg-white dark:bg-gray-900'
-                                  }`}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono font-black text-xs text-gray-900 dark:text-white">#{order.id}</span>
-                                      {isUnread && (
-                                        <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
-                                      )}
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 font-bold mt-1.5 uppercase truncate">{order.customer.name}</p>
-                                    <p className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-0.5 font-bold">
-                                      <Clock className="w-3.5 h-3.5 text-gray-400" />
-                                      {formatDate(order.date)} • {formatTime(order.date)}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-xs font-black text-gray-900 dark:text-white">৳{order.total}</p>
-                                    <span className="text-[8px] font-black uppercase text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded mt-1 inline-block">Pending</span>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </>
-                      )}
-
-                      {/* TAB 2: PENDING REVIEWS */}
-                      {notifTab === 'reviews' && (
-                        <>
-                          {pendingReviews.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
-                              <MessageSquare className="h-8 w-8 opacity-20" />
-                              <p className="font-bold uppercase tracking-wider text-[10px]">সব রিভিউ চেক করা হয়েছে! 🌟</p>
-                              <p className="text-[9px] opacity-70">No pending reviews waiting for approval.</p>
-                            </div>
-                          ) : (
-                            pendingReviews.map(review => {
-                              const isUnread = !readReviewIds.includes(review.id);
-                              const reviewProduct = products.find(p => p.id === review.productId);
-                              return (
-                                <div 
-                                  key={review.id}
-                                  onClick={() => {
-                                    if (isUnread) {
-                                      setReadReviewIds(prev => [...prev, review.id]);
-                                    }
-                                    setActiveTab('reviews');
-                                    setIsNotifOpen(false);
-                                  }}
-                                  className={`p-3.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-all flex justify-between items-center gap-3 border ${
-                                    isUnread 
-                                      ? 'bg-blue-50/40 border-blue-150 dark:bg-blue-950/10 dark:border-green-900/30' 
-                                      : 'border-transparent bg-white dark:bg-gray-900'
-                                  }`}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-black text-xs text-gray-900 dark:text-white uppercase tracking-tight">{review.userName}</span>
-                                      {isUnread && (
-                                        <span className="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
-                                      )}
-                                    </div>
-                                    <div className="flex gap-0.5 mt-1">
-                                      {[1,2,3,4,5].map(s => (
-                                        <Star key={s} size={8} className={s <= review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"} />
-                                      ))}
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 font-bold mt-1.5 uppercase truncate">{reviewProduct?.name || 'Unknown Product'}</p>
-                                    <p className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-0.5 font-medium italic line-clamp-1">
-                                      "{review.comment}"
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded mt-1 inline-block">Pending</span>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </>
-                      )}
-
-                      {/* TAB 2: INVENTORY STOCK ALERTS */}
-                      {notifTab === 'stock' && (
-                        <>
-                          {lowStockProducts.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
-                              <PackageCheck className="h-8 w-8 opacity-20" />
-                              <p className="font-bold uppercase tracking-wider text-[10px]">স্টক লেভেল একদম ঠিক আছে! 👍</p>
-                              <p className="text-[9px] opacity-70">No products have critically low inventory.</p>
-                            </div>
-                          ) : (
-                            lowStockProducts.map(p => {
-                              return (
-                                <div 
-                                  key={p.id}
-                                  onClick={() => {
-                                    setIsAddingProduct(false);
-                                    setEditingProduct(p);
-                                    setActiveTab(p.isCollection ? 'collection' : 'shop');
-                                    setIsNotifOpen(false);
-                                    
-                                    // Smooth scroll to the product form block
-                                    setTimeout(() => {
-                                      const element = document.getElementById('edit-product-form') || document.querySelector('form');
-                                      if (element) {
-                                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        <button
+                          onClick={() => setNotifTab('stock')}
+                          className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+                            notifTab === 'stock'
+                              ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white bg-white dark:bg-gray-950/40 font-black'
+                              : 'border-transparent text-gray-400 hover:text-gray-900'
+                          }`}
+                        >
+                          Stock Alerts
+                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                            lowStockProducts.length > 0 
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' 
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
+                          }`}>
+                            {lowStockProducts.length}
+                          </span>
+                        </button>
+                      </div>
+  
+                      {/* Scrollable Content Container */}
+                      <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 p-2">
+                        {/* TAB 1: NEW/PENDING ORDERS */}
+                        {notifTab === 'orders' && (
+                          <>
+                            {pendingOrders.length === 0 ? (
+                              <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
+                                <ShoppingBag className="h-8 w-8 opacity-20" />
+                                <p className="font-bold uppercase tracking-wider text-[10px]">সব অর্ডার প্রসেস করা হয়েছে! 🎉</p>
+                                <p className="text-[9px] opacity-70">No pending orders waiting for you.</p>
+                              </div>
+                            ) : (
+                              pendingOrders.map(order => {
+                                const isUnread = !readOrderIds.includes(order.id);
+                                return (
+                                  <div 
+                                    key={order.id}
+                                    onClick={() => {
+                                      if (isUnread) {
+                                        setReadOrderIds(prev => [...prev, order.id]);
                                       }
-                                    }, 200);
-                                  }}
-                                  className="p-3.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-all flex items-center gap-3 bg-white dark:bg-gray-900 border border-transparent"
-                                >
-                                  <img 
-                                    src={p.image} 
-                                    alt={p.name} 
-                                    className="w-10 h-10 rounded-lg object-cover bg-gray-50 border border-gray-100 dark:border-gray-800 shrink-0" 
-                                    referrerPolicy="no-referrer"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="text-xs font-black text-gray-900 dark:text-white truncate">{p.name}</h4>
-                                    <p className="text-[9px] text-gray-400 font-bold mt-0.5 uppercase tracking-wider">Code: {p.code || 'None'} • {p.category}</p>
+                                      setOrderSearchQuery(order.id);
+                                      setAppliedOrderQuery(order.id);
+                                      setOrderStatusFilter('all');
+                                      setAppliedOrderStatusFilter('all');
+                                      setSelectedOrderForView(order);
+                                      setActiveTab('orders');
+                                      setIsNotifOpen(false);
+                                    }}
+                                    className={`p-3.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-all flex justify-between items-center gap-3 border ${
+                                      isUnread 
+                                        ? 'bg-green-50/40 border-green-150 dark:bg-green-950/10 dark:border-green-900/30' 
+                                        : 'border-transparent bg-white dark:bg-gray-900'
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono font-black text-xs text-gray-900 dark:text-white">#{order.id}</span>
+                                        {isUnread && (
+                                          <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-gray-400 font-bold mt-1.5 uppercase truncate">{order.customer.name}</p>
+                                      <p className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-0.5 font-bold">
+                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                        {formatDate(order.date)} • {formatTime(order.date)}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-xs font-black text-gray-900 dark:text-white">৳{order.total}</p>
+                                      <span className="text-[8px] font-black uppercase text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded mt-1 inline-block">Pending</span>
+                                    </div>
                                   </div>
-                                  <div className="text-right shrink-0">
-                                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-red-50 text-red-600 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30">
-                                      {p.stock <= 0 ? 'Stock Out' : `${p.stock} Left`}
-                                    </span>
+                                );
+                              })
+                            )}
+                          </>
+                        )}
+  
+                        {/* TAB 2: PENDING REVIEWS */}
+                        {notifTab === 'reviews' && (
+                          <>
+                            {pendingReviews.length === 0 ? (
+                              <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
+                                <MessageSquare className="h-8 w-8 opacity-20" />
+                                <p className="font-bold uppercase tracking-wider text-[10px]">সব রিভিউ চেক করা হয়েছে! 🌟</p>
+                                <p className="text-[9px] opacity-70">No pending reviews waiting for approval.</p>
+                              </div>
+                            ) : (
+                              pendingReviews.map(review => {
+                                const isUnread = !readReviewIds.includes(review.id);
+                                const reviewProduct = products.find(p => p.id === review.productId);
+                                return (
+                                  <div 
+                                    key={review.id}
+                                    onClick={() => {
+                                      if (isUnread) {
+                                        setReadReviewIds(prev => [...prev, review.id]);
+                                      }
+                                      setActiveTab('reviews');
+                                      setIsNotifOpen(false);
+                                    }}
+                                    className={`p-3.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-all flex justify-between items-center gap-3 border ${
+                                      isUnread 
+                                        ? 'bg-blue-50/40 border-blue-150 dark:bg-blue-950/10 dark:border-green-900/30' 
+                                        : 'border-transparent bg-white dark:bg-gray-900'
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-black text-xs text-gray-900 dark:text-white uppercase tracking-tight">{review.userName}</span>
+                                        {isUnread && (
+                                          <span className="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
+                                        )}
+                                      </div>
+                                      <div className="flex gap-0.5 mt-1">
+                                        {[1,2,3,4,5].map(s => (
+                                          <Star key={s} size={8} className={s <= review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"} />
+                                        ))}
+                                      </div>
+                                      <p className="text-[10px] text-gray-400 font-bold mt-1.5 uppercase truncate">{reviewProduct?.name || 'Unknown Product'}</p>
+                                      <p className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-0.5 font-medium italic line-clamp-1">
+                                        "{review.comment}"
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded mt-1 inline-block">Pending</span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
+                                );
+                              })
+                            )}
+                          </>
+                        )}
+  
+                        {/* TAB 2: INVENTORY STOCK ALERTS */}
+                        {notifTab === 'stock' && (
+                          <>
+                            {lowStockProducts.length === 0 ? (
+                              <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
+                                <PackageCheck className="h-8 w-8 opacity-20" />
+                                <p className="font-bold uppercase tracking-wider text-[10px]">স্টক লেভেল একদম ঠিক আছে! 👍</p>
+                                <p className="text-[9px] opacity-70">No products have critically low inventory.</p>
+                              </div>
+                            ) : (
+                              lowStockProducts.map(p => {
+                                return (
+                                  <div 
+                                    key={p.id}
+                                    onClick={() => {
+                                      setIsAddingProduct(false);
+                                      setEditingProduct(p);
+                                      setActiveTab(p.isCollection ? 'collection' : 'shop');
+                                      setIsNotifOpen(false);
+                                      
+                                      // Smooth scroll to the product form block
+                                      setTimeout(() => {
+                                        const element = document.getElementById('edit-product-form') || document.querySelector('form');
+                                        if (element) {
+                                          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        }
+                                      }, 200);
+                                    }}
+                                    className="p-3.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-all flex items-center gap-3 bg-white dark:bg-gray-900 border border-transparent"
+                                  >
+                                    <img 
+                                      src={p.image} 
+                                      alt={p.name} 
+                                      className="w-10 h-10 rounded-lg object-cover bg-gray-50 border border-gray-100 dark:border-gray-800 shrink-0" 
+                                      referrerPolicy="no-referrer"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-xs font-black text-gray-900 dark:text-white truncate">{p.name}</h4>
+                                      <p className="text-[9px] text-gray-400 font-bold mt-0.5 uppercase tracking-wider">Code: {p.code || 'None'} • {p.category}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-red-50 text-red-600 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30">
+                                        {p.stock <= 0 ? 'Stock Out' : `${p.stock} Left`}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -5301,7 +5317,9 @@ export default function AdminDashboard() {
                     policies: true,
                     reviews: true,
                     otps: false,
-                    otpsDelete: false
+                    otpsDelete: false,
+                    activityLogs: false,
+                    notifications: true
                   });
                   setIsAddingAdmin(true);
                 }}
@@ -5599,6 +5617,19 @@ export default function AdminDashboard() {
                           />
                           <div>
                             <span className="text-xs font-black uppercase text-gray-800 block">Reviews</span>
+                          </div>
+                        </label>
+
+                        {/* notifications permissions */}
+                        <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 hover:border-black cursor-pointer transition-all select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={newAdminPermissions.notifications || false} 
+                            onChange={e => setNewAdminPermissions({...newAdminPermissions, notifications: e.target.checked})}
+                            className="rounded border-gray-300 text-black focus:ring-black h-4.5 w-4.5 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-black uppercase text-gray-800 block">Notifications Center</span>
                           </div>
                         </label>
                       </div>

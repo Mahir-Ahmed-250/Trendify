@@ -266,12 +266,80 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  let vite: any;
+  if (process.env.NODE_ENV !== "production") {
+    vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+  }
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // --- Dynamic OG Tag Injection for Product Sharing ---
+  app.get("/product/:id", async (req, res, next) => {
+    try {
+      const db = await readDb();
+      const product = db.products?.find((p: any) => p.id === req.params.id);
+      
+      if (!product) return next();
+
+      let htmlFile = (process.env.NODE_ENV === "production" || !vite)
+        ? path.join(process.cwd(), "dist", "index.html")
+        : path.join(process.cwd(), "index.html");
+
+      // Fallback if production file doesn't exist yet
+      try {
+        await fs.access(htmlFile);
+      } catch (e) {
+        if (process.env.NODE_ENV === "production") {
+          return next();
+        }
+        htmlFile = path.join(process.cwd(), "index.html");
+      }
+
+      let html = await fs.readFile(htmlFile, "utf-8");
+
+      const title = `${product.name} | Trendify`;
+      const description = product.description || `Premium quality ${product.name} available at Trendify. Shop now for the best deals.`;
+      const image = (product.images && product.images.length > 0) ? product.images[0] : "";
+
+      const ogTags = `
+    <title>${title}</title>
+    <meta name="description" content="${description}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:image" content="${image}" />
+    <meta property="og:url" content="${req.protocol}://${req.get('host')}/product/${product.id}" />
+    <meta property="og:type" content="product" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:image" content="${image}" />
+      `;
+
+      // Replace existing title and meta description if any, then insert new ones
+      if (html.includes("<title>")) {
+        html = html.replace(/<title>.*?<\/title>/, ogTags);
+      } else {
+        html = html.replace("<head>", `<head>${ogTags}`);
+      }
+
+      if (vite) {
+        html = await vite.transformIndexHtml(req.originalUrl, html);
+      }
+
+      res.status(200).set({ "Content-Type": "text/html" }).send(html);
+    } catch (err) {
+      console.error("Meta injection error:", err);
+      next();
+    }
   });
 
   app.get("/api/db", async (req, res) => {
@@ -542,11 +610,7 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
+  if (vite) {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");

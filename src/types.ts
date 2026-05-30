@@ -165,6 +165,7 @@ export interface AdminPermissions {
   otpsDelete?: boolean;
   activityLogs?: boolean;
   reviews?: boolean;
+  notifications?: boolean;
 }
 
 export interface ActivityLog {
