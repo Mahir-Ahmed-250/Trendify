@@ -3,8 +3,8 @@ import Lottie from 'lottie-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, PieChart, Pie, Legend } from 'recharts';
 import { useShop } from '../ShopContext';
-import { Package, ShoppingBag, Ticket, Trash2, Plus, Edit, LogOut, Layout, Image, Camera, X, Users, Mail, MonitorPlay, Printer, HelpCircle, ShieldCheck, Ruler, ShoppingBasket, Home, TrendingUp, DollarSign, PackageCheck, UserCircle, Settings, Megaphone, MessageSquare, Search, Calendar, MapPin, Truck, CheckCircle, XCircle, Download, Clock, Bell } from 'lucide-react';
-import { Product, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, LookbookImage, CategoryBanner, Coupon, Order, AdminPermissions } from '../types';
+import { Package, ShoppingBag, Ticket, Trash2, Plus, Edit, LogOut, Layout, Image, Camera, X, Users, Mail, MonitorPlay, Printer, HelpCircle, ShieldCheck, Ruler, ShoppingBasket, Home, TrendingUp, DollarSign, PackageCheck, UserCircle, Settings, Megaphone, MessageSquare, Search, Calendar, MapPin, Truck, CheckCircle, XCircle, Download, Clock, Bell, Key, History, Loader2, Star } from 'lucide-react';
+import { Product, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, LookbookImage, CategoryBanner, Coupon, Order, AdminPermissions, Review } from '../types';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 import { compressImage, fileToBase64 } from '../lib/imageUtils';
@@ -28,6 +28,663 @@ const SummaryCard = ({ title, count, icon: Icon, alert }: { title: string, count
 const formatDate = (date: string | number | Date) => new Date(date).toLocaleDateString('en-GB');
 const formatTime = (date: string | number | Date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+function AdminActivityLogsView() {
+  const { activityLogs, admins } = useShop();
+  const [search, setSearch] = useState('');
+  const [actionFilter, setActionFilter] = useState('all');
+  const [moduleFilter, setModuleFilter] = useState('all');
+  const [adminFilter, setAdminFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+
+  // Filter logic
+  const filteredLogs = (activityLogs || []).filter(log => {
+    const actType = log.actionType || (log as any).action || '';
+    const targetMod = log.targetModule || (log as any).module || '';
+
+    // Search filter
+    const matchesSearch = 
+      (log.details || '').toLowerCase().includes(search.toLowerCase()) ||
+      (log.adminEmail || '').toLowerCase().includes(search.toLowerCase()) ||
+      actType.toLowerCase().includes(search.toLowerCase()) ||
+      targetMod.toLowerCase().includes(search.toLowerCase());
+      
+    // Action filter
+    let matchesAction = false;
+    if (actionFilter === 'all') {
+      matchesAction = true;
+    } else if (actionFilter === 'login') {
+      matchesAction = actType === 'auth' && (log.details || '').toLowerCase().includes('logged in');
+    } else if (actionFilter === 'logout') {
+      matchesAction = actType === 'auth' && (log.details || '').toLowerCase().includes('logged out');
+    } else {
+      matchesAction = actType === actionFilter;
+    }
+
+    // Module filter
+    const matchesModule = moduleFilter === 'all' || targetMod === moduleFilter;
+
+    // Admin filter
+    const matchesAdmin = adminFilter === 'all' || log.adminEmail === adminFilter;
+
+    // Date filter
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const logDate = new Date(log.timestamp);
+      if (dateFilter === 'today') {
+        matchesDate = logDate.toDateString() === now.toDateString();
+      } else if (dateFilter === 'week') {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        matchesDate = logDate >= sevenDaysAgo;
+      } else if (dateFilter === 'month') {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        matchesDate = logDate >= thirtyDaysAgo;
+      }
+    }
+
+    return matchesSearch && matchesAction && matchesModule && matchesAdmin && matchesDate;
+  });
+
+  // Calculate high-quality analytics
+  const totalCount = filteredLogs.length;
+  const createCount = filteredLogs.filter(l => (l.actionType || (l as any).action) === 'create').length;
+  const updateCount = filteredLogs.filter(l => (l.actionType || (l as any).action) === 'update').length;
+  const deleteCount = filteredLogs.filter(l => (l.actionType || (l as any).action) === 'delete').length;
+
+  // Find most active admin in these filtered logs
+  const adminActivityCounts = filteredLogs.reduce((acc, log) => {
+    acc[log.adminEmail] = (acc[log.adminEmail] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  let mostActiveAdmin = 'N/A';
+  let maxActivity = 0;
+  Object.keys(adminActivityCounts).forEach(email => {
+    const count = adminActivityCounts[email];
+    if (count > maxActivity) {
+      maxActivity = count;
+      mostActiveAdmin = email;
+    }
+  });
+
+  // Export to Excel function using XLSX (already imported!)
+  const handleExport = () => {
+    if (filteredLogs.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: 'No Data',
+        text: 'কোনো লগ ডাটা পাওয়া যায়নি এক্সপোর্ট করার জন্য।',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    const dataToExport = filteredLogs.map((log, index) => ({
+      Serial: index + 1,
+      Timestamp: new Date(log.timestamp).toLocaleString('en-US'),
+      AdminEmail: log.adminEmail,
+      Action: (log.actionType || (log as any).action || '').toUpperCase(),
+      Module: (log.targetModule || (log as any).module || '').toUpperCase(),
+      Details: log.details
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Activity Logs');
+    XLSX.writeFile(workbook, `Activity_Logs_${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+    Swal.fire({
+      icon: 'success',
+      title: 'Export Success',
+      text: 'এক্সেল ফাইলে সব লগ সফলভাবে ডাউনলোড করা হয়েছে।',
+      timer: 1500,
+      showConfirmButton: false
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-100 pb-4 gap-4">
+        <div>
+          <h1 className="text-2xl font-black uppercase text-gray-900 tracking-tight flex items-center gap-2">
+            <History className="h-6 w-6 text-indigo-600" /> Activity & Audit Logs 📋
+          </h1>
+          <p className="text-xs text-gray-500 font-medium">কোন এডমিন কখন প্রোডাক্ট যোগ করল, অর্ডার আপডেট করল কিংবা কোনো কুপন মুছল—তাত্ক্ষণিকভাবে সম্পূর্ণ হিস্ট্রি ট্র্যাক করুন।</p>
+        </div>
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[11px] uppercase tracking-widest px-5 py-3 rounded-xl shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all text-center self-start md:self-auto"
+        >
+          <Download className="h-4 w-4" /> Export To Excel 📊
+        </button>
+      </div>
+
+      {/* Analytics widgets */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+            <History className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Actions</p>
+            <p className="text-xl font-black text-indigo-900">{totalCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
+            <CheckCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Creations</p>
+            <p className="text-xl font-black text-emerald-900">{createCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
+            <Calendar className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modifications</p>
+            <p className="text-xl font-black text-blue-900">{updateCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4 col-span-2 lg:col-span-1">
+          <div className="p-3 bg-rose-50 rounded-2xl text-rose-600">
+            <Trash2 className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Most Active Staff</p>
+            <p className="text-xs font-black text-rose-950 truncate max-w-[150px]" title={mostActiveAdmin}>
+              {mostActiveAdmin.split('@')[0]} ({maxActivity})
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter bars panel */}
+      <div className="bg-gray-50 border border-gray-200/60 p-4 rounded-3xl flex flex-col gap-4">
+        <div className="text-xs font-extrabold uppercase tracking-widest text-gray-500">Filter Parameters</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search keyword..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-10 w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm"
+            />
+          </div>
+
+          {/* Action filter */}
+          <div>
+            <select
+              value={actionFilter}
+              onChange={e => setActionFilter(e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
+            >
+              <option value="all">⚡ All Operations</option>
+              <option value="create">🟢 Create</option>
+              <option value="update">🔵 Update</option>
+              <option value="delete">🔴 Delete</option>
+              <option value="login">🔐 Login</option>
+              <option value="logout">🚪 Logout</option>
+            </select>
+          </div>
+
+          {/* Module filter */}
+          <div>
+            <select
+              value={moduleFilter}
+              onChange={e => setModuleFilter(e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
+            >
+              <option value="all">📂 All Sections</option>
+              <option value="products">🛍️ Products</option>
+              <option value="orders">📦 Orders</option>
+              <option value="coupons">🎟️ Coupons</option>
+              <option value="otps">🔑 OTP Secrets</option>
+              <option value="admins">👤 Staff Admins</option>
+              <option value="slides">🎦 Slider Banner</option>
+              <option value="categories">🏷️ Categories</option>
+              <option value="lookbook">📷 Lookbook</option>
+              <option value="subscribers">✉️ Subscribers</option>
+              <option value="messages">💬 Contact Messages</option>
+              <option value="ads">📣 Advertisements</option>
+              <option value="faqs">❓ FAQs</option>
+              <option value="policies">🛡️ Policies</option>
+            </select>
+          </div>
+
+          {/* Admin email filter */}
+          <div>
+            <select
+              value={adminFilter}
+              onChange={e => setAdminFilter(e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
+            >
+              <option value="all">👥 All Admins</option>
+              {Array.from(new Set((activityLogs || []).map(l => l.adminEmail))).filter(Boolean).map(email => (
+                <option key={email} value={email}>
+                  👤 {email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date range filter */}
+          <div>
+            <select
+              value={dateFilter}
+              onChange={e => setDateFilter(e.target.value)}
+              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
+            >
+              <option value="all">📅 All Time</option>
+              <option value="today">☀️ Today</option>
+              <option value="week">🗓️ Last 7 days</option>
+              <option value="month">🌙 Last 30 days</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Logs Table */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Timestamp</th>
+                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">User / Administrator</th>
+                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Activity Type</th>
+                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Target Module</th>
+                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Audit Log Statement Summary</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 px-6 text-center text-gray-400 font-extrabold text-xs uppercase tracking-widest">
+                     কোনো একটিভিটি রেকর্ড পাওয়া যায়নি!
+                  </td>
+                </tr>
+              ) : (
+                filteredLogs.map(log => {
+                  const actType = log.actionType || (log as any).action || '';
+                  const targetMod = log.targetModule || (log as any).module || '';
+
+                  // Badge color scheme
+                  const actionColors: Record<string, string> = {
+                    create: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                    update: 'bg-blue-50 text-blue-700 border-blue-100',
+                    delete: 'bg-rose-50 text-rose-700 border-rose-100',
+                    login: 'bg-amber-50 text-amber-700 border-amber-100',
+                    logout: 'bg-purple-50 text-purple-700 border-purple-100',
+                    auth: 'bg-amber-50 text-amber-700 border-amber-100'
+                  };
+
+                  let displayAction = actType;
+                  if (actType === 'auth') {
+                    if ((log.details || '').toLowerCase().includes('logged out')) {
+                      displayAction = 'logout';
+                    } else {
+                      displayAction = 'login';
+                    }
+                  }
+
+                  const currentActionColor = actionColors[displayAction] || 'bg-gray-100 text-gray-700 border-gray-200';
+
+                  return (
+                    <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                      {/* Timestamp */}
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-extrabold text-gray-900">
+                            {formatDate(log.timestamp)}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-black tracking-widest flex items-center gap-1 mt-0.5">
+                            <Clock className="h-3 w-3 inline text-indigo-400" /> {formatTime(log.timestamp)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Admin User */}
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-black text-xs text-indigo-700 uppercase">
+                            {log.adminEmail ? log.adminEmail.charAt(0) : 'A'}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-extrabold text-gray-900 truncate max-w-[150px]" title={log.adminEmail}>
+                              {log.adminEmail}
+                            </span>
+                            {admins?.find(a => a.email === log.adminEmail)?.role === 'super' ? (
+                              <span className="text-[8px] font-black uppercase text-amber-600 block mt-0.5">👑 Super Admin</span>
+                            ) : (
+                              <span className="text-[8px] font-black uppercase text-gray-400 block mt-0.5">🛡️ Staff Admin</span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Activity Type badge */}
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${currentActionColor}`}>
+                          {displayAction}
+                        </span>
+                      </td>
+
+                      {/* Target Section */}
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <span className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-md bg-gray-100 border border-gray-200 text-gray-600 font-mono">
+                          {targetMod}
+                        </span>
+                      </td>
+
+                      {/* Log description */}
+                      <td className="py-4 px-6">
+                        <p className="text-xs font-bold text-gray-700 break-words leading-relaxed max-w-[400px]">
+                          {log.details}
+                        </p>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminOTPView() {
+  const { otps, deleteOTP, currentAdmin } = useShop();
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const filteredOtps = (otps || []).filter(o => 
+    (o.phone || '').includes(searchQuery) || 
+    (o.email || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (o.otp || '').includes(searchQuery)
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-black uppercase tracking-tight">Track Order OTPs 🔑</h1>
+          <p className="text-xs text-gray-500 font-medium">ইউজারদের ইমেইল ও মোবাইল নম্বরে পাঠানো সকল OTP কোড এবং এর বর্তমান অবস্থা এখানে দেখতে পাবেন। কোনো ইউজারের কোড না গেলে এখান থেকে নিয়ে বলতে পারবেন।</p>
+        </div>
+        <div className="relative w-full md:w-80">
+          <input
+            type="text"
+            placeholder="ইমেইল, নম্বর বা OTP দিয়ে খুঁজুন..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-black"
+          />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[700px]">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Email / Phone</th>
+                <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">OTP Code</th>
+                <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Sent Date / Time</th>
+                <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Status / Verification</th>
+                <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredOtps.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-xs text-gray-400 font-bold uppercase tracking-widest">
+                    কোনো OTP পাওয়া যায়নি!
+                  </td>
+                </tr>
+              ) : (
+                filteredOtps.map((record) => (
+                  <tr key={record.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="p-4">
+                      {record.email ? (
+                        <span className="font-semibold text-gray-950 font-sans border-b border-dashed border-gray-200 pb-0.5" title="Email OTP">{record.email}</span>
+                      ) : (
+                        <span className="font-mono font-bold text-gray-700 bg-gray-50 py-1 px-2 rounded-lg" title="Phone OTP">+88{record.phone}</span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <span className="inline-block bg-blue-50 text-blue-700 font-mono font-black text-base px-3 py-1 rounded-xl border border-blue-100 tracking-widest">
+                        {record.otp}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-xs text-gray-500 font-bold">
+                        {new Date(record.createdAt).toLocaleString('bn-BD', { hour12: true })}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      {record.verified ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 border border-green-100 rounded-full text-[10px] font-black uppercase tracking-widest">
+                          <CheckCircle className="h-3 w-3" /> VERIFIED
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full text-[10px] font-black uppercase tracking-widest">
+                          <Clock className="h-3 w-3" /> PENDING CODE USE
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <button
+                        onClick={() => {
+                          Swal.fire({
+                            title: 'Are you sure?',
+                            text: 'This will delete this OTP record permanently!',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#d33',
+                            cancelButtonColor: '#3085d6',
+                            confirmButtonText: 'Yes, delete it!'
+                          }).then((result) => {
+                            if (result.isConfirmed) {
+                              deleteOTP(record.id);
+                              Swal.fire('Deleted!', 'OTP request has been deleted.', 'success');
+                            }
+                          });
+                        }}
+                        className="text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors"
+                        title="Delete OTP"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminReviewsView() {
+  const { reviews, products, updateReviewStatus, deleteReview } = useShop();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | Review['status']>('all');
+
+  const filteredReviews = reviews.filter(r => {
+    const product = products.find(p => p.id === r.productId);
+    const productName = product ? product.name.toLowerCase() : '';
+    
+    const matchesSearch = 
+      r.userName.toLowerCase().includes(search.toLowerCase()) ||
+      r.comment.toLowerCase().includes(search.toLowerCase()) ||
+      r.orderId.toLowerCase().includes(search.toLowerCase()) ||
+      productName.includes(search.toLowerCase());
+      
+    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleDelete = (id: string) => {
+    Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        deleteReview(id);
+        Swal.fire('Deleted!', 'Review has been deleted.', 'success');
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-100 pb-4 gap-4">
+        <div>
+          <h1 className="text-2xl font-black uppercase text-gray-900 tracking-tight flex items-center gap-2">
+            <MessageSquare className="h-6 w-6 text-amber-500" /> Product Reviews Management 🌟
+          </h1>
+          <p className="text-xs text-gray-500 font-medium">কাস্টমারদের দেওয়া রিভিউগুলো চেক করুন এবং ঠিক করুন কোনটি সাইটে দেখাবে আর কোনটি দেখাবে না।</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="Search by name, comment or order ID..." 
+            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-xl text-sm focus:ring-1 focus:ring-black outline-none"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <select 
+          className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-black outline-none"
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value as any)}
+        >
+          <option value="all">All Status (সব স্ট্যাটাস)</option>
+          <option value="pending">Pending Approval (অপেক্ষমান)</option>
+          <option value="approved">Approved (অনুমোদিত)</option>
+          <option value="hidden">Hidden (লুকানো)</option>
+        </select>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest pl-6">Customer / Order</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest">Product</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest">Feedback</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest">Status</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest text-right pr-6">Management</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 font-bold uppercase tracking-widest text-xs">
+              {filteredReviews.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center text-gray-400 italic">No reviews found matching the criteria.</td>
+                </tr>
+              ) : (
+                filteredReviews.map(review => {
+                  const product = products.find(p => p.id === review.productId);
+                  return (
+                    <tr key={review.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="p-4 pl-6">
+                        <div className="flex flex-col">
+                          <span className="text-gray-900">{review.userName}</span>
+                          <span className="text-[10px] text-indigo-500 font-black">{review.orderId}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        {product ? (
+                          <div className="flex items-center gap-2">
+                             <img src={product.image} className="w-8 h-8 rounded-lg object-cover" alt="" />
+                             <span className="max-w-[150px] truncate">{product.name}</span>
+                          </div>
+                        ) : 'Unknown Product'}
+                      </td>
+                      <td className="p-4 max-w-xs">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} size={10} className={s <= review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"} />
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-gray-500 normal-case italic line-clamp-2">"{review.comment}"</p>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded-full text-[9px] ${
+                          review.status === 'approved' ? 'bg-green-50 text-green-600' : 
+                          review.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
+                          'bg-gray-100 text-gray-500'
+                        }`}>
+                          {review.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right pr-6">
+                        <div className="flex items-center justify-end gap-2">
+                          {review.status !== 'approved' && (
+                            <button 
+                              onClick={() => updateReviewStatus(review.id, 'approved')}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Approve Review"
+                            >
+                              <CheckCircle size={18} />
+                            </button>
+                          )}
+                          {review.status === 'approved' && (
+                            <button 
+                              onClick={() => updateReviewStatus(review.id, 'hidden')}
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              title="Hide Review"
+                            >
+                              <XCircle size={18} />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleDelete(review.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Permanently"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [dbStatus, setDbStatus] = useState<{
@@ -44,8 +701,8 @@ export default function AdminDashboard() {
       .then(data => setDbStatus(data))
       .catch(err => console.error('Error fetching db status:', err));
   }, []);
-  const { products, orders, coupons, slides, updateSlide, categoryBanners, updateCategoryBanner, lookbook, subscribers, contactMessages, popupAds, homeAds, faqs, policies, addProduct, updateProduct, deleteProduct, updateOrderStatus, updateOrderNotes, deleteOrder, addCoupon, updateCoupon, deleteCoupon, addSlide, deleteSlide, addCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage, deleteSubscriber, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd, addHomeAd, deleteHomeAd, updateHomeAd, addFAQ, updateFAQ, deleteFAQ, addPolicy, updatePolicy, deletePolicy, isAdminAuth, loginAdmin, logoutAdmin, currentAdmin, admins, addAdmin, updateAdmin, deleteAdmin } = useShop();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'shop' | 'collection' | 'orders' | 'coupons' | 'slides' | 'categories' | 'lookbook' | 'subscribers' | 'messages' | 'ads' | 'faqs' | 'policies' | 'admins' | 'profile'>('dashboard');
+  const { products, reviews, updateReviewStatus, deleteReview, orders, coupons, slides, updateSlide, categoryBanners, updateCategoryBanner, lookbook, subscribers, contactMessages, popupAds, homeAds, faqs, policies, addProduct, updateProduct, deleteProduct, updateOrderStatus, updateOrderNotes, deleteOrder, addCoupon, updateCoupon, deleteCoupon, addSlide, deleteSlide, addCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage, deleteSubscriber, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd, addHomeAd, deleteHomeAd, updateHomeAd, addFAQ, updateFAQ, deleteFAQ, addPolicy, updatePolicy, deletePolicy, isAdminAuth, loginAdmin, logoutAdmin, currentAdmin, admins, addAdmin, updateAdmin, deleteAdmin } = useShop();
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'shop' | 'collection' | 'orders' | 'coupons' | 'slides' | 'categories' | 'lookbook' | 'subscribers' | 'messages' | 'ads' | 'faqs' | 'policies' | 'admins' | 'profile' | 'reviews' | 'activities' | 'otps'>('dashboard');
   const [isAddingFAQ, setIsAddingFAQ] = useState(false);
   const [editingFAQ, setEditingFAQ] = useState<FAQItem | null>(null);
   const [newFAQ, setNewFAQ] = useState<Omit<FAQItem, 'id'>>({ question: '', answer: '' });
@@ -66,10 +723,18 @@ export default function AdminDashboard() {
 
   // Notification states
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [notifTab, setNotifTab] = useState<'orders' | 'stock'>('orders');
+  const [notifTab, setNotifTab] = useState<'orders' | 'stock' | 'reviews'>('orders');
   const [readOrderIds, setReadOrderIds] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('admin_read_order_ids') || '[]');
+    } catch (_) {
+      return [];
+    }
+  });
+
+  const [readReviewIds, setReadReviewIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('admin_read_review_ids') || '[]');
     } catch (_) {
       return [];
     }
@@ -79,6 +744,10 @@ export default function AdminDashboard() {
     localStorage.setItem('admin_read_order_ids', JSON.stringify(readOrderIds));
   }, [readOrderIds]);
 
+  useEffect(() => {
+    localStorage.setItem('admin_read_review_ids', JSON.stringify(readReviewIds));
+  }, [readReviewIds]);
+
   const changeTab = (tab: typeof activeTab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -86,6 +755,9 @@ export default function AdminDashboard() {
   const today = new Date().toDateString();
   const todaysNewOrders = orders.filter(o => new Date(o.date).toDateString() === today).length;
   const totalPendingOrders = orders.filter(o => o.status === 'pending').length;
+
+  const pendingReviews = reviews.filter(r => r.status === 'pending');
+  const unreadPendingReviews = pendingReviews.filter(r => !readReviewIds.includes(r.id));
 
   // Analytics
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
@@ -485,7 +1157,10 @@ export default function AdminDashboard() {
     messages: true,
     ads: true,
     faqs: true,
-    policies: true
+    policies: true,
+    otps: false,
+    otpsDelete: false,
+    activityLogs: false
   });
 
   // Auto-routing for general admin depending on permissions
@@ -503,7 +1178,9 @@ export default function AdminDashboard() {
         faqs: 'faqs',
         subscribers: 'subscribers',
         messages: 'messages',
-        policies: 'policies'
+        policies: 'policies',
+        otps: 'otps',
+        activities: 'activityLogs'
       };
 
       const requiredPermission = activeTabMap[activeTab];
@@ -522,6 +1199,8 @@ export default function AdminDashboard() {
         if (currentAdmin.permissions?.subscribers) permissibleTabs.push('subscribers');
         if (currentAdmin.permissions?.messages) permissibleTabs.push('messages');
         if (currentAdmin.permissions?.policies) permissibleTabs.push('policies');
+        if (currentAdmin.permissions?.otps) permissibleTabs.push('otps');
+        if (currentAdmin.permissions?.activityLogs) permissibleTabs.push('activities');
 
         if (permissibleTabs.length > 0) {
           setActiveTab(permissibleTabs[0]);
@@ -1128,6 +1807,24 @@ export default function AdminDashboard() {
                   <Ticket className="h-4.5 w-4.5" /> Coupons
                 </motion.button>
               )}
+
+              {/* Reviews Button */}
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.reviews) && (
+                <motion.button
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => changeTab('reviews')}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'reviews' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <div className="relative">
+                    <MessageSquare className="h-4.5 w-4.5" />
+                    {reviews.filter(r => r.status === 'pending').length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 w-2 h-2 rounded-full border border-white"></span>
+                    )}
+                  </div>
+                  Reviews
+                </motion.button>
+              )}
     
               {/* Slides Button */}
               {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.slides) && (
@@ -1195,9 +1892,33 @@ export default function AdminDashboard() {
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => changeTab('policies')}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                  className={`w-full flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'policies' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
                   <ShieldCheck className="h-4.5 w-4.5" /> Policies
+                </motion.button>
+              )}
+
+              {/* OTP List Button */}
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.otps) && (
+                <motion.button
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => changeTab('otps')}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'otps' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <Key className="h-4.5 w-4.5" /> OTP List 🔑
+                </motion.button>
+              )}
+
+              {/* Activity Log Button */}
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.activityLogs) && (
+                <motion.button
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => changeTab('activities')}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'activities' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <History className="h-4.5 w-4.5 text-black dark:text-white" /> Activity Log 📋
                 </motion.button>
               )}
     
@@ -1264,12 +1985,12 @@ export default function AdminDashboard() {
               }`}
             >
               <Bell className="h-[18px] w-[18px]" />
-              {/* Glowing Indicator Badge - Green for New/Pending Orders, Red for Low Stock Alerts */}
-              {(unreadPendingOrders.length + lowStockProducts.length) > 0 && (
+              {/* Glowing Indicator Badge - Green for New/Pending Orders, Red for Low Stock Alerts, Blue for Reviews */}
+              {(unreadPendingOrders.length + lowStockProducts.length + unreadPendingReviews.length) > 0 && (
                 <span className={`absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full text-[9px] font-black text-white border border-white dark:border-gray-900 animate-pulse ${
-                  unreadPendingOrders.length > 0 ? 'bg-green-600' : 'bg-red-600'
+                  unreadPendingOrders.length > 0 ? 'bg-green-600' : (unreadPendingReviews.length > 0 ? 'bg-blue-600' : 'bg-red-600')
                 }`}>
-                  {unreadPendingOrders.length + lowStockProducts.length}
+                  {unreadPendingOrders.length + lowStockProducts.length + unreadPendingReviews.length}
                 </span>
               )}
             </motion.button>
@@ -1307,6 +2028,18 @@ export default function AdminDashboard() {
                           Mark All Read
                         </button>
                       )}
+
+                      {notifTab === 'reviews' && unreadPendingReviews.length > 0 && (
+                        <button 
+                          onClick={() => {
+                            const unreadIds = pendingReviews.filter(r => !readReviewIds.includes(r.id)).map(r => r.id);
+                            setReadReviewIds(prev => [...prev, ...unreadIds]);
+                          }}
+                          className="text-[10px] font-black uppercase text-gray-500 hover:text-black dark:hover:text-white tracking-wider bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors border border-gray-100 dark:border-gray-700"
+                        >
+                          Mark All Read
+                        </button>
+                      )}
                     </div>
 
                     {/* Navigation Tabs */}
@@ -1326,6 +2059,24 @@ export default function AdminDashboard() {
                             : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
                         }`}>
                           {unreadPendingOrders.length}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setNotifTab('reviews')}
+                        className={`flex-1 py-3 text-center transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+                          notifTab === 'reviews'
+                            ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white bg-white dark:bg-gray-950/40 font-black'
+                            : 'border-transparent text-gray-400 hover:text-gray-900'
+                        }`}
+                      >
+                        Reviews 
+                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                          unreadPendingReviews.length > 0 
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' 
+                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
+                        }`}>
+                          {unreadPendingReviews.length}
                         </span>
                       </button>
                       
@@ -1399,6 +2150,62 @@ export default function AdminDashboard() {
                                   <div className="text-right">
                                     <p className="text-xs font-black text-gray-900 dark:text-white">৳{order.total}</p>
                                     <span className="text-[8px] font-black uppercase text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded mt-1 inline-block">Pending</span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </>
+                      )}
+
+                      {/* TAB 2: PENDING REVIEWS */}
+                      {notifTab === 'reviews' && (
+                        <>
+                          {pendingReviews.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
+                              <MessageSquare className="h-8 w-8 opacity-20" />
+                              <p className="font-bold uppercase tracking-wider text-[10px]">সব রিভিউ চেক করা হয়েছে! 🌟</p>
+                              <p className="text-[9px] opacity-70">No pending reviews waiting for approval.</p>
+                            </div>
+                          ) : (
+                            pendingReviews.map(review => {
+                              const isUnread = !readReviewIds.includes(review.id);
+                              const reviewProduct = products.find(p => p.id === review.productId);
+                              return (
+                                <div 
+                                  key={review.id}
+                                  onClick={() => {
+                                    if (isUnread) {
+                                      setReadReviewIds(prev => [...prev, review.id]);
+                                    }
+                                    setActiveTab('reviews');
+                                    setIsNotifOpen(false);
+                                  }}
+                                  className={`p-3.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-all flex justify-between items-center gap-3 border ${
+                                    isUnread 
+                                      ? 'bg-blue-50/40 border-blue-150 dark:bg-blue-950/10 dark:border-green-900/30' 
+                                      : 'border-transparent bg-white dark:bg-gray-900'
+                                  }`}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-xs text-gray-900 dark:text-white uppercase tracking-tight">{review.userName}</span>
+                                      {isUnread && (
+                                        <span className="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping" />
+                                      )}
+                                    </div>
+                                    <div className="flex gap-0.5 mt-1">
+                                      {[1,2,3,4,5].map(s => (
+                                        <Star key={s} size={8} className={s <= review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"} />
+                                      ))}
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 font-bold mt-1.5 uppercase truncate">{reviewProduct?.name || 'Unknown Product'}</p>
+                                    <p className="text-[9px] text-gray-500 flex items-center gap-1.5 mt-0.5 font-medium italic line-clamp-1">
+                                      "{review.comment}"
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded mt-1 inline-block">Pending</span>
                                   </div>
                                 </div>
                               );
@@ -1958,7 +2765,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label><textarea required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors h-20 resize-none" value={newProduct.description} onChange={e=>setNewProduct({...newProduct, description: e.target.value})} /></div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Category</label><input required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.category} onChange={e=>setNewProduct({...newProduct, category: e.target.value})} placeholder="যেমন- Basic, Cotton, Sleeveless, Oversized, Winter" /></div>
-                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Product Code (Optional)</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.code || ''} onChange={e=>setNewProduct({...newProduct, code: e.target.value})} placeholder="যেমন- TS-1001 (ঐচ্ছিক)" /></div>
+                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Product Code (Optional)</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.code || ''} onChange={e=>setNewProduct({...newProduct, code: e.target.value})} placeholder="যেমন- TY-1001 (ঐচ্ছিক)" /></div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Size Chart Image URL</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.sizeChartImage || ''} onChange={e=>setNewProduct({...newProduct, sizeChartImage: e.target.value})} placeholder="Optional size guide image URL (যেমন- https://...)" /></div>
                 <div className="md:col-span-2 flex items-center gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100 mb-2 font-bold uppercase tracking-widest text-xs">
                   <div className="flex items-center gap-2">
@@ -2105,7 +2912,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label><textarea required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors h-20 resize-none" value={editingProduct.description} onChange={e=>setEditingProduct({...editingProduct, description: e.target.value})} /></div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Category</label><input required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.category || ''} onChange={e=>setEditingProduct({...editingProduct, category: e.target.value})} placeholder="যেমন- Basic, Cotton, Sleeveless, Oversized, Winter" /></div>
-                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Product Code</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.code || ''} onChange={e=>setEditingProduct({...editingProduct, code: e.target.value})} placeholder="যেমন- TS-1001" /></div>
+                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Product Code</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.code || ''} onChange={e=>setEditingProduct({...editingProduct, code: e.target.value})} placeholder="যেমন- TY-1001" /></div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Size Chart Image URL</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.sizeChartImage || ''} onChange={e=>setEditingProduct({...editingProduct, sizeChartImage: e.target.value})} placeholder="Optional size guide image URL (যেমন- https://...)" /></div>
                 <div className="md:col-span-2 flex items-center gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100 mb-2 font-bold uppercase tracking-widest text-xs">
                   <div className="flex items-center gap-2">
@@ -2238,8 +3045,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <table className="w-full text-left text-sm">
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto w-full">
+              <table className="w-full text-left text-sm min-w-[800px] md:min-w-0">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Serial</th>
@@ -2334,8 +3141,8 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <table className="w-full text-left text-sm">
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto w-full">
+              <table className="w-full text-left text-sm min-w-[800px] md:min-w-0">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Serial</th>
@@ -2863,6 +3670,93 @@ export default function AdminDashboard() {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                           {/* Left Column: Items */}
                           <div className="lg:col-span-2 space-y-8">
+                            {/* Visual Progress Stepper for Orders */}
+                            {(() => {
+                              const steps = [
+                                { key: 'pending', label: 'Pending', labelBn: 'পেন্ডিং', icon: Clock, desc: 'Awaiting review' },
+                                { key: 'processing', label: 'Processing', labelBn: 'প্রসেসিং', icon: Loader2, desc: 'Preparing package' },
+                                { key: 'shipped', label: 'Shipped', labelBn: 'শিপড', icon: Truck, desc: 'With courier' },
+                                { key: 'delivered', label: 'Delivered', labelBn: 'ডেলিভার্ড', icon: CheckCircle, desc: 'Completed' }
+                              ];
+                              const statusOrder = ['pending', 'processing', 'shipped', 'delivered'];
+                              const currentStepIndex = statusOrder.indexOf(selectedOrderForView.status);
+                              const isCancelled = selectedOrderForView.status === 'cancelled';
+                              const completionPercentage = isCancelled ? 0 : Math.max(0, (currentStepIndex / 3) * 100);
+
+                              return (
+                                <div className="bg-gray-50 border border-gray-100 rounded-[2.5rem] p-6" id="admin-order-stepper">
+                                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-3 border-b border-gray-200/50">
+                                    <div>
+                                      <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest col-span-2">Order Milestone Progress</h4>
+                                      <p className="text-sm font-black text-gray-800 mt-0.5">অর্ডার অগ্রগতি ট্র্যাকিং</p>
+                                    </div>
+                                    {isCancelled ? (
+                                      <span className="bg-red-500 text-white text-[9px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1">
+                                        <X className="w-3 h-3" /> Cancelled / বাতিল
+                                      </span>
+                                    ) : (
+                                      <span className="bg-blue-50 text-blue-700 text-[9px] font-black uppercase px-3 py-1 rounded-full border border-blue-100 flex items-center gap-1">
+                                        Active Level: {selectedOrderForView.status}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-2">
+                                    {/* Desktop line */}
+                                    <div className="absolute hidden md:block left-[12%] right-[12%] top-[20px] h-[2px] bg-gray-200 -z-0 rounded-full" />
+                                    {!isCancelled && (
+                                      <div 
+                                        className="absolute hidden md:block left-[12%] top-[20px] h-[2px] bg-blue-600 transition-all duration-700 -z-0 rounded-full" 
+                                        style={{ width: `calc(${completionPercentage}% * 0.76)` }}
+                                      />
+                                    )}
+
+                                    {/* Mobile line */}
+                                    <div className="absolute md:hidden left-[20px] top-6 bottom-6 w-[2px] bg-gray-200 -z-0 rounded-full" />
+                                    {!isCancelled && (
+                                      <div 
+                                        className="absolute md:hidden left-[20px] top-6 w-[2px] bg-blue-600 transition-all duration-700 -z-0 rounded-full" 
+                                        style={{ height: `${completionPercentage}%` }}
+                                      />
+                                    )}
+
+                                    {steps.map((step, idx) => {
+                                      const isCompleted = !isCancelled && currentStepIndex > idx;
+                                      const isActive = !isCancelled && currentStepIndex === idx;
+
+                                      return (
+                                        <div key={step.key} className="flex md:flex-col items-center md:text-center gap-4 md:gap-2 flex-1 w-full relative z-10">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
+                                            isCompleted ? 'bg-blue-600 border-blue-600 text-white shadow-sm' :
+                                            isActive ? 'bg-white border-blue-600 text-blue-600 shadow-md ring-4 ring-blue-50 scale-105' :
+                                            'bg-white border-gray-200 text-gray-400'
+                                          }`}>
+                                            {isCompleted ? (
+                                              <CheckCircle className="w-4.5 h-4.5" />
+                                            ) : (
+                                              <step.icon className={`w-4.5 h-4.5 ${isActive ? 'animate-pulse' : ''}`} />
+                                            )}
+                                          </div>
+                                          <div className="flex flex-col md:items-center">
+                                            <span className={`text-[9px] font-black uppercase tracking-wider ${
+                                              isActive ? 'text-blue-600' : isCompleted ? 'text-gray-900' : 'text-gray-400'
+                                            }`}>
+                                              {step.label}
+                                            </span>
+                                            <span className={`text-[11px] font-bold mt-0.5 leading-none ${
+                                              isActive ? 'text-gray-900 font-extrabold' : isCompleted ? 'text-gray-600 font-semibold' : 'text-gray-400'
+                                            }`}>
+                                              {step.labelBn}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
                             <section>
                               <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
                                 <ShoppingBag className="w-4 h-4" /> Ordered Items ({selectedOrderForView.items.length})
@@ -3234,6 +4128,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Reviews Tab */}
+        {activeTab === 'reviews' && (
+          <AdminReviewsView />
+        )}
+
         {/* Slides Tab */}
         {activeTab === 'slides' && (
           <div>
@@ -3321,8 +4220,8 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <table className="w-full text-left text-sm">
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto w-full">
+              <table className="w-full text-left text-sm min-w-[700px] md:min-w-0">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Image & Title</th>
@@ -3524,8 +4423,8 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <table className="w-full text-left text-sm">
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden overflow-x-auto w-full">
+              <table className="w-full text-left text-sm min-w-[750px] md:min-w-0">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                      <th className="p-4 font-bold uppercase text-[10px] text-gray-400 tracking-widest">Image & Title</th>
@@ -4364,6 +5263,16 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* OTP List Tab */}
+        {activeTab === 'otps' && (currentAdmin?.role === 'super' || currentAdmin?.permissions?.otps) && (
+          <AdminOTPView />
+        )}
+
+        {/* Activity Log Tab */}
+        {activeTab === 'activities' && (currentAdmin?.role === 'super' || currentAdmin?.permissions?.activityLogs) && (
+          <AdminActivityLogsView />
+        )}
+
         {/* Admins Tab (SUPER ADMIN ONLY) */}
         {activeTab === 'admins' && currentAdmin?.role === 'super' && (
           <div>
@@ -4389,7 +5298,10 @@ export default function AdminDashboard() {
                     messages: true,
                     ads: true,
                     faqs: true,
-                    policies: true
+                    policies: true,
+                    reviews: true,
+                    otps: false,
+                    otpsDelete: false
                   });
                   setIsAddingAdmin(true);
                 }}
@@ -4621,7 +5533,7 @@ export default function AdminDashboard() {
                             className="rounded border-gray-300 text-black focus:ring-black h-4.5 w-4.5 cursor-pointer"
                           />
                           <div>
-                            <span className="text-xs font-black uppercase text-gray-800 block">Ads Highlights</span>
+                            <span className="text-xs font-black uppercase text-gray-800 block">Ads</span>
                           </div>
                         </label>
 
@@ -4648,6 +5560,45 @@ export default function AdminDashboard() {
                           />
                           <div>
                             <span className="text-xs font-black uppercase text-gray-800 block">Policies</span>
+                          </div>
+                        </label>
+
+                        {/* otps permissions */}
+                        <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 hover:border-black cursor-pointer transition-all select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={newAdminPermissions.otps || false} 
+                            onChange={e => setNewAdminPermissions({...newAdminPermissions, otps: e.target.checked})}
+                            className="rounded border-gray-300 text-black focus:ring-black h-4.5 w-4.5 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-black uppercase text-gray-800 block">OTPS</span>
+                          </div>
+                        </label>
+
+                        {/* activityLogs permissions */}
+                        <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 hover:border-black cursor-pointer transition-all select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={newAdminPermissions.activityLogs || false} 
+                            onChange={e => setNewAdminPermissions({...newAdminPermissions, activityLogs: e.target.checked})}
+                            className="rounded border-gray-300 text-black focus:ring-black h-4.5 w-4.5 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-black uppercase text-gray-800 block">Activity Logs</span>
+                          </div>
+                        </label>
+
+                        {/* reviews permissions */}
+                        <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 hover:border-black cursor-pointer transition-all select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={newAdminPermissions.reviews || false} 
+                            onChange={e => setNewAdminPermissions({...newAdminPermissions, reviews: e.target.checked})}
+                            className="rounded border-gray-300 text-black focus:ring-black h-4.5 w-4.5 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-black uppercase text-gray-800 block">Reviews</span>
                           </div>
                         </label>
                       </div>
@@ -4678,7 +5629,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {admins?.map(admin => {
+                    {admins?.filter(a => a.isActive !== false).map(admin => {
                       const enabledCount = Object.values(admin.permissions || {}).filter(Boolean).length;
                       
                       return (
@@ -4728,7 +5679,10 @@ export default function AdminDashboard() {
                                     messages: 'Messages',
                                     ads: 'Ads',
                                     faqs: 'FAQs',
-                                    policies: 'Policies'
+                                    policies: 'Policies',
+                                    otps: 'OTP Secrets Tracker',
+                                    activityLogs: 'Activity Logs',
+                                    reviews: 'Manage Reviews'
                                   };
                                   
                                   return (

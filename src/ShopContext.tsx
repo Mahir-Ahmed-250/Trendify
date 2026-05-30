@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, Order, Coupon, CartItem, CustomerInfo, Slide, CategoryBanner, LookbookImage, Subscriber, ContactMessage, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser } from './types';
+import { Product, Order, Coupon, CartItem, CustomerInfo, Slide, CategoryBanner, LookbookImage, Subscriber, ContactMessage, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, OTPRecord, ActivityLog, Review } from './types';
 import { initialProducts, initialCoupons, initialSlides, initialCategoryBanners, initialLookbook } from './mockData';
 import { generateId } from './lib/utils';
 
@@ -20,6 +20,8 @@ interface ShopContextType {
   isAdminAuth: boolean;
   currentAdmin: AdminUser | null;
   admins: AdminUser[];
+  activityLogs: ActivityLog[];
+  logActivity: (actionType: ActivityLog['actionType'], targetModule: string, details: string, adminOverride?: AdminUser) => void;
   addToCart: (product: Product, quantity?: number, selectedSize?: string) => void;
   removeFromCart: (productId: string, selectedSize?: string) => void;
   updateCartQuantity: (productId: string, quantity: number, selectedSize?: string) => void;
@@ -66,10 +68,19 @@ interface ShopContextType {
   addPolicy: (policy: Omit<PolicyItem, 'id'>) => void;
   updatePolicy: (policy: PolicyItem) => void;
   deletePolicy: (id: string) => void;
+  otps: OTPRecord[];
+  addOTP: (phone: string, otp: string, email?: string) => void;
+  deleteOTP: (id: string) => void;
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  wishlist: string[]; // Store product IDs
+  toggleWishlist: (productId: string) => void;
+  reviews: Review[];
+  addReview: (review: Omit<Review, 'id' | 'status' | 'date'>) => { success: boolean; message: string };
+  updateReviewStatus: (reviewId: string, status: Review['status']) => void;
+  deleteReview: (reviewId: string) => void;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -204,6 +215,26 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : defaultHomeAds;
   });
 
+  const [otps, setOtps] = useState<OTPRecord[]>(() => {
+    const saved = localStorage.getItem('ts_otps');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
+    const saved = localStorage.getItem('ts_activity_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [wishlist, setWishlist] = useState<string[]>(() => {
+    const saved = localStorage.getItem('ts_wishlist');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [reviews, setReviews] = useState<Review[]>(() => {
+    const saved = localStorage.getItem('ts_reviews');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const defaultSuperAdmin: AdminUser = {
     id: 'super_admin_id',
     email: 'xahin.mahir@gmail.com',
@@ -221,7 +252,11 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       messages: true,
       ads: true,
       faqs: true,
-      policies: true
+      policies: true,
+      otps: true,
+      otpsDelete: true,
+      activityLogs: true,
+      reviews: true
     }
   };
 
@@ -284,6 +319,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (dbData.popupAds) setPopupAds(dbData.popupAds);
           if (dbData.homeAds) setHomeAds(dbData.homeAds);
           if (dbData.admins) setAdmins(dbData.admins);
+          if (dbData.otps) setOtps(dbData.otps);
+          if (dbData.activityLogs) setActivityLogs(dbData.activityLogs);
         } else {
           // Initialize server with local storage values or default mocks
           const initialDb = {
@@ -299,7 +336,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
             contactMessages,
             popupAds,
             homeAds,
-            admins
+            admins,
+            otps,
+            activityLogs
           };
           await fetch('/api/db/init', {
             method: 'POST',
@@ -344,6 +383,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useServerSync('faqs', faqs, 'ts_faqs');
   useServerSync('policies', policies, 'ts_policies');
   useServerSync('admins', admins, 'ts_admins');
+  useServerSync('otps', otps, 'ts_otps');
+  useServerSync('activityLogs', activityLogs, 'ts_activity_logs');
+  useServerSync('wishlist', wishlist, 'ts_wishlist');
+  useServerSync('reviews', reviews, 'ts_reviews');
 
   useEffect(() => { 
     localStorage.setItem('ts_cart', JSON.stringify(cart)); 
@@ -372,34 +415,123 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleDarkMode = () => setIsDarkMode(prev => !prev);
 
+  const toggleWishlist = (productId: string) => {
+    setWishlist(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId) 
+        : [...prev, productId]
+    );
+  };
+
+  const addReview = (reviewData: Omit<Review, 'id' | 'status' | 'date'>) => {
+    // Validate orderId (case-insensitive and trimmed)
+    const submittedId = reviewData.orderId.trim().toUpperCase();
+    const order = orders.find(o => o.id.trim().toUpperCase() === submittedId);
+    if (!order) {
+      return { success: false, message: `Invalid Order ID (${submittedId}). অনুগ্রহ করে সঠিক অর্ডার আইডি দিন।` };
+    }
+
+    // Validate if product is in that order
+    const hasProduct = order.items.some(item => item.id === reviewData.productId);
+    if (!hasProduct) {
+      return { success: false, message: 'This product was not part of this order (এই প্রোডাক্টটি এই অর্ডারের অন্তর্ভুক্ত নয়)' };
+    }
+
+    // Check if user already reviewed this product with this order
+    const alreadyReviewed = reviews.some(r => r.orderId === reviewData.orderId && r.productId === reviewData.productId && !r.deleted);
+    if (alreadyReviewed) {
+      return { success: false, message: 'You have already submitted a review for this product using this Order ID (আপনি ইতিমধ্যে এই অর্ডার আইডির জন্য একটি রিভিউ দিয়েছেন)' };
+    }
+
+    const newReview: Review = {
+      ...reviewData,
+      id: generateId(),
+      status: 'pending',
+      date: new Date().toISOString(),
+    };
+
+    setReviews(prev => [newReview, ...prev]);
+    return { success: true, message: 'Review submitted for moderation! (রিভিউটি অনুমোদনের জন্য পাঠানো হয়েছে!)' };
+  };
+
+  const updateReviewStatus = (reviewId: string, status: Review['status']) => {
+    setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status } : r));
+    logActivity('update', 'reviews', `Changed review #${reviewId} status to ${status}`);
+  };
+
+  const deleteReview = (reviewId: string) => {
+    setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, deleted: true } : r));
+    logActivity('delete', 'reviews', `Deleted review #${reviewId}`);
+  };
+
+  const logActivity = (actionType: ActivityLog['actionType'], targetModule: string, details: string, adminOverride?: AdminUser) => {
+    let admin = adminOverride || currentAdmin;
+    if (!admin) {
+      const saved = localStorage.getItem('ts_current_admin');
+      if (saved && saved !== 'undefined') {
+        try {
+          admin = JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+
+    const newLog: ActivityLog = {
+      id: generateId(),
+      adminId: admin?.id || 'system',
+      adminName: admin?.name || admin?.email?.split('@')[0] || 'System/Customer',
+      adminEmail: admin?.email || 'system@trendify.com',
+      actionType,
+      targetModule,
+      details,
+      timestamp: new Date().toISOString()
+    };
+    setActivityLogs(prev => [newLog, ...prev]);
+  };
+
   const loginAdmin = (email: string, pass: string) => {
     const found = admins.find(a => a.email.toLowerCase() === email.toLowerCase() && a.password === pass);
     if (found) {
       setCurrentAdmin(found);
       setIsAdminAuth(true);
+      logActivity('auth', 'admins', `Admin logged in successfully: ${found.email} (${found.role})`, found);
       return true;
     }
+    logActivity('auth', 'admins', `Failed login attempt for email: ${email}`);
     return false;
   };
 
   const logoutAdmin = () => {
+    if (currentAdmin) {
+      logActivity('auth', 'admins', `Admin logged out: ${currentAdmin.email}`);
+    }
     setCurrentAdmin(null);
     setIsAdminAuth(false);
   };
 
   const addAdmin = (admin: AdminUser) => {
-    setAdmins(prev => [...prev, admin]);
+    const updatedAdmins = [...admins, admin];
+    setAdmins(updatedAdmins);
+    serverSave('admins', updatedAdmins);
+    logActivity('create', 'admins', `Created admin account: "${admin.email}" (Name: ${admin.name}, Role: ${admin.role})`);
   };
 
   const updateAdmin = (admin: AdminUser) => {
-    setAdmins(prev => prev.map(a => a.id === admin.id ? admin : a));
+    const updatedAdmins = admins.map(a => a.id === admin.id ? admin : a);
+    setAdmins(updatedAdmins);
+    serverSave('admins', updatedAdmins);
+    logActivity('update', 'admins', `Updated admin account/permissions: "${admin.email}" (Role: ${admin.role})`);
     if (currentAdmin && currentAdmin.id === admin.id) {
       setCurrentAdmin(admin);
     }
   };
 
   const deleteAdmin = (id: string) => {
-    setAdmins(prev => prev.filter(a => a.id !== id));
+    const adminToDelete = admins.find(a => a.id === id);
+    const emailStr = adminToDelete ? adminToDelete.email : `ID - ${id}`;
+    // Hard delete from state so it propagates to server sync and gets removed from MongoDB
+    const updatedAdmins = admins.filter(a => a.id !== id);
+    setAdmins(updatedAdmins);
+    logActivity('delete', 'admins', `Deleted admin account: "${emailStr}"`);
     if (currentAdmin && currentAdmin.id === id) {
       setCurrentAdmin(null);
       setIsAdminAuth(false);
@@ -476,8 +608,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const total = subtotal - discount;
 
+    const newOrderId = `TND-${Date.now()}${(Math.random() * 1000).toFixed(0)}`;
+
     const newOrder: Order = {
-      id: generateId(),
+      id: newOrderId,
       customer,
       items: [...cart],
       subtotal,
@@ -505,38 +639,73 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setOrders(prev => [newOrder, ...prev]);
     clearCart();
+    logActivity('create', 'orders', `New order placed: ${newOrder.id} (Total: ৳${total}) by ${customer.name}`);
     return { success: true, orderId: newOrder.id };
   };
 
   // Admin
   const addProduct = (product: Omit<Product, 'id'>) => {
-    const code = product.code && product.code.trim() 
+    // Generate sequential code if none provided
+    let code = product.code && product.code.trim() 
       ? product.code.trim().toUpperCase() 
-      : 'TS-' + Math.floor(1000 + Math.random() * 9000);
+      : '';
+    
+    if (!code) {
+      const tyCodes = products
+        .map(p => p.code || '')
+        .filter(c => c.startsWith('TY-'))
+        .map(c => parseInt(c.split('-')[1]))
+        .filter(n => !isNaN(n));
+      const maxNum = tyCodes.length > 0 ? Math.max(...tyCodes) : 1000;
+      code = `TY-${maxNum + 1}`;
+    }
+    
     setProducts(prev => [{ ...product, code, id: generateId() }, ...prev]);
+    logActivity('create', 'products', `Added product: "${product.name}" (Code: ${code}, Price: ৳${product.price})`);
   };
 
   const updateProduct = (product: Product) => {
-    const code = product.code && product.code.trim()
+    let code = product.code && product.code.trim()
       ? product.code.trim().toUpperCase()
-      : 'TS-' + Math.floor(1000 + Math.random() * 9000);
+      : '';
+    
+    if (!code) {
+      const tyCodes = products
+        .filter(p => p.id !== product.id)
+        .map(p => p.code || '')
+        .filter(c => c.startsWith('TY-'))
+        .map(c => parseInt(c.split('-')[1]))
+        .filter(n => !isNaN(n));
+      const maxNum = tyCodes.length > 0 ? Math.max(...tyCodes) : 1000;
+      code = `TY-${maxNum + 1}`;
+    }
+    
     setProducts(prev => prev.map(p => p.id === product.id ? { ...product, code } : p));
+    logActivity('update', 'products', `Updated product: "${product.name}" (Code: ${code}, Price: ৳${product.price})`);
   };
 
   const deleteProduct = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
+    const prod = products.find(p => p.id === id);
+    const prodName = prod ? `"${prod.name}"` : `ID - ${id}`;
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, deleted: true } : p));
+    logActivity('delete', 'products', `Deleted product: ${prodName}`);
   };
 
   const addCoupon = (coupon: Omit<Coupon, 'id'>) => {
     setCoupons(prev => [{ ...coupon, id: generateId() }, ...prev]);
+    logActivity('create', 'coupons', `Added coupon: "${coupon.code}" (${coupon.discountValue}${coupon.discountType === 'percentage' ? '%' : ' ৳'} discount)`);
   };
 
   const updateCoupon = (coupon: Coupon) => {
     setCoupons(prev => prev.map(c => c.id === coupon.id ? coupon : c));
+    logActivity('update', 'coupons', `Updated coupon: "${coupon.code}" (${coupon.discountValue}${coupon.discountType === 'percentage' ? '%' : ' ৳'} discount)`);
   };
 
   const deleteCoupon = (id: string) => {
-    setCoupons(prev => prev.filter(c => c.id !== id));
+    const coup = coupons.find(c => c.id === id);
+    const coupCode = coup ? `"${coup.code}"` : `ID - ${id}`;
+    setCoupons(prev => prev.map(c => c.id === id ? { ...c, deleted: true } : c));
+    logActivity('delete', 'coupons', `Deleted coupon: ${coupCode}`);
   };
 
   const updateOrderStatus = (orderId: string, status: Order['status']) => {
@@ -575,57 +744,159 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return prev.map(o => o.id === orderId ? { ...o, status } : o);
     });
+    logActivity('update', 'orders', `Updated status of order "${orderId}" to "${status}"`);
   };
 
   const updateOrderNotes = (orderId: string, notes: string) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, notes } : o));
+    logActivity('update', 'orders', `Updated notes/history for order "${orderId}"`);
   };
 
   const deleteOrder = (id: string) => {
-    setOrders(prev => prev.filter(o => o.id !== id));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, deleted: true } : o));
+    logActivity('delete', 'orders', `Deleted order: "${id}"`);
   };
 
-  const addSlide = (slide: Omit<Slide, 'id'>) => setSlides(prev => [{...slide, id: generateId()}, ...prev]);
-  const updateSlide = (slide: Slide) => setSlides(prev => prev.map(s => s.id === slide.id ? slide : s));
-  const deleteSlide = (id: string) => setSlides(prev => prev.filter(s => s.id !== id));
+  const addSlide = (slide: Omit<Slide, 'id'>) => {
+    setSlides(prev => [{...slide, id: generateId()}, ...prev]);
+    logActivity('create', 'slides', `Added slider banner: "${slide.title || 'Untitled'}"`);
+  };
+  const updateSlide = (slide: Slide) => {
+    setSlides(prev => prev.map(s => s.id === slide.id ? slide : s));
+    logActivity('update', 'slides', `Updated slider banner: "${slide.title || 'Untitled'}"`);
+  };
+  const deleteSlide = (id: string) => {
+    setSlides(prev => prev.map(s => s.id === id ? { ...s, deleted: true } : s));
+    logActivity('delete', 'slides', `Deleted slider banner with ID: ${id}`);
+  };
   
-  const addCategoryBanner = (banner: Omit<CategoryBanner, 'id'>) => setCategoryBanners(prev => [{...banner, id: generateId()}, ...prev]);
-  const updateCategoryBanner = (banner: CategoryBanner) => setCategoryBanners(prev => prev.map(b => b.id === banner.id ? banner : b));
-  const deleteCategoryBanner = (id: string) => setCategoryBanners(prev => prev.filter(b => b.id !== id));
+  const addCategoryBanner = (banner: Omit<CategoryBanner, 'id'>) => {
+    setCategoryBanners(prev => [{...banner, id: generateId()}, ...prev]);
+    logActivity('create', 'categories', `Added category banner: "${banner.title || 'Untitled'}"`);
+  };
+  const updateCategoryBanner = (banner: CategoryBanner) => {
+    setCategoryBanners(prev => prev.map(b => b.id === banner.id ? banner : b));
+    logActivity('update', 'categories', `Updated category banner: "${banner.title || 'Untitled'}"`);
+  };
+  const deleteCategoryBanner = (id: string) => {
+    setCategoryBanners(prev => prev.map(b => b.id === id ? { ...b, deleted: true } : b));
+    logActivity('delete', 'categories', `Deleted category banner with ID: ${id}`);
+  };
 
-  const addLookbookImage = (img: Omit<LookbookImage, 'id'>) => setLookbook(prev => [{...img, id: generateId()}, ...prev]);
-  const updateLookbookImage = (img: LookbookImage) => setLookbook(prev => prev.map(l => l.id === img.id ? img : l));
-  const deleteLookbookImage = (id: string) => setLookbook(prev => prev.filter(l => l.id !== id));
+  const addLookbookImage = (img: Omit<LookbookImage, 'id'>) => {
+    setLookbook(prev => [{...img, id: generateId()}, ...prev]);
+    logActivity('create', 'lookbook', `Added lookbook item: "${img.title || 'Untitled'}"`);
+  };
+  const updateLookbookImage = (img: LookbookImage) => {
+    setLookbook(prev => prev.map(l => l.id === img.id ? img : l));
+    logActivity('update', 'lookbook', `Updated lookbook item: "${img.title || 'Untitled'}"`);
+  };
+  const deleteLookbookImage = (id: string) => {
+    setLookbook(prev => prev.map(l => l.id === id ? { ...l, deleted: true } : l));
+    logActivity('delete', 'lookbook', `Deleted lookbook item with ID: ${id}`);
+  };
 
   const addSubscriber = (email: string) => {
     if (!subscribers.find(s => s.email === email)) {
       setSubscribers(prev => [{ id: generateId(), email, date: new Date().toISOString() }, ...prev]);
+      logActivity('create', 'subscribers', `New user subscribed to newsletter: ${email}`);
     }
   };
-  const deleteSubscriber = (id: string) => setSubscribers(prev => prev.filter(s => s.id !== id));
+  const deleteSubscriber = (id: string) => {
+    const sub = subscribers.find(s => s.id === id);
+    const subEmail = sub ? sub.email : `ID - ${id}`;
+    setSubscribers(prev => prev.map(s => s.id === id ? { ...s, deleted: true } : s));
+    logActivity('delete', 'subscribers', `Deleted subscriber: ${subEmail}`);
+  };
 
   const addContactMessage = (msg: Omit<ContactMessage, 'id' | 'date'>) => {
     setContactMessages(prev => [{ ...msg, id: generateId(), date: new Date().toISOString() }, ...prev]);
+    logActivity('create', 'messages', `New contact message from: ${msg.name} (${msg.email})`);
   };
-  const deleteContactMessage = (id: string) => setContactMessages(prev => prev.filter(m => m.id !== id));
+  const deleteContactMessage = (id: string) => {
+    const msg = contactMessages.find(m => m.id === id);
+    const msgSender = msg ? `${msg.name} (${msg.email})` : `ID - ${id}`;
+    setContactMessages(prev => prev.map(m => m.id === id ? { ...m, deleted: true } : m));
+    logActivity('delete', 'messages', `Deleted contact message from: ${msgSender}`);
+  };
 
-  const addPopupAd = (ad: Omit<PopupAd, 'id'>) => setPopupAds(prev => [{...ad, id: generateId()}, ...prev]);
-  const deletePopupAd = (id: string) => setPopupAds(prev => prev.filter(a => a.id !== id));
+  const addPopupAd = (ad: Omit<PopupAd, 'id'>) => {
+    setPopupAds(prev => [{...ad, id: generateId()}, ...prev]);
+    logActivity('create', 'ads', `Created popup ad with image: "${ad.imageUrl}"`);
+  };
+  const deletePopupAd = (id: string) => {
+    setPopupAds(prev => prev.map(a => a.id === id ? { ...a, deleted: true } : a));
+    logActivity('delete', 'ads', `Deleted popup ad with ID: ${id}`);
+  };
   const updatePopupAd = (id: string, updatedAd: Partial<PopupAd>) => {
     setPopupAds(prev => prev.map(ad => ad.id === id ? { ...ad, ...updatedAd } : ad));
+    logActivity('update', 'ads', `Updated popup ad details for ID: ${id}`);
   };
 
-  const addHomeAd = (ad: Omit<HomeAd, 'id'>) => setHomeAds(prev => [{...ad, id: generateId()}, ...prev]);
-  const deleteHomeAd = (id: string) => setHomeAds(prev => prev.filter(a => a.id !== id));
-  const updateHomeAd = (ad: HomeAd) => setHomeAds(prev => prev.map(a => a.id === ad.id ? ad : a));
+  const addHomeAd = (ad: Omit<HomeAd, 'id'>) => {
+    setHomeAds(prev => [{...ad, id: generateId()}, ...prev]);
+    logActivity('create', 'ads', `Created banner/home ad campaign: "${ad.title || 'Untitled'}"`);
+  };
+  const deleteHomeAd = (id: string) => {
+    setHomeAds(prev => prev.map(a => a.id === id ? { ...a, deleted: true } : a));
+    logActivity('delete', 'ads', `Deleted banner/home ad campaign with ID: ${id}`);
+  };
+  const updateHomeAd = (ad: HomeAd) => {
+    setHomeAds(prev => prev.map(a => a.id === ad.id ? ad : a));
+    logActivity('update', 'ads', `Updated banner/home ad campaign: "${ad.title || 'Untitled'}"`);
+  };
 
-  const addFAQ = (faq: Omit<FAQItem, 'id'>) => setFaqs(prev => [{ ...faq, id: generateId() }, ...prev]);
-  const updateFAQ = (faq: FAQItem) => setFaqs(prev => prev.map(f => f.id === faq.id ? faq : f));
-  const deleteFAQ = (id: string) => setFaqs(prev => prev.filter(f => f.id !== id));
+  const addFAQ = (faq: Omit<FAQItem, 'id'>) => {
+    setFaqs(prev => [{ ...faq, id: generateId() }, ...prev]);
+    logActivity('create', 'faqs', `Added FAQ item: "${faq.question}"`);
+  };
+  const updateFAQ = (faq: FAQItem) => {
+    setFaqs(prev => prev.map(f => f.id === faq.id ? faq : f));
+    logActivity('update', 'faqs', `Updated FAQ item: "${faq.question}"`);
+  };
+  const deleteFAQ = (id: string) => {
+    const item = faqs.find(f => f.id === id);
+    const itemQuestion = item ? `"${item.question}"` : `ID - ${id}`;
+    setFaqs(prev => prev.map(f => f.id === id ? { ...f, deleted: true } : f));
+    logActivity('delete', 'faqs', `Deleted FAQ: ${itemQuestion}`);
+  };
 
-  const addPolicy = (policy: Omit<PolicyItem, 'id'>) => setPolicies(prev => [{ ...policy, id: generateId() }, ...prev]);
-  const updatePolicy = (policy: PolicyItem) => setPolicies(prev => prev.map(p => p.id === policy.id ? policy : p));
-  const deletePolicy = (id: string) => setPolicies(prev => prev.filter(p => p.id !== id));
+  const addPolicy = (policy: Omit<PolicyItem, 'id'>) => {
+    setPolicies(prev => [{ ...policy, id: generateId() }, ...prev]);
+    logActivity('create', 'policies', `Created policy page item: "${policy.title}"`);
+  };
+  const updatePolicy = (policy: PolicyItem) => {
+    setPolicies(prev => prev.map(p => p.id === policy.id ? policy : p));
+    logActivity('update', 'policies', `Updated policy page item: "${policy.title}"`);
+  };
+  const deletePolicy = (id: string) => {
+    const pol = policies.find(p => p.id === id);
+    const polTitle = pol ? `"${pol.title}"` : `ID - ${id}`;
+    setPolicies(prev => prev.map(p => p.id === id ? { ...p, deleted: true } : p));
+    logActivity('delete', 'policies', `Deleted policy item: ${polTitle}`);
+  };
+
+  const addOTP = (phone: string, otp: string, email?: string) => {
+    setOtps(prev => [
+      {
+         id: generateId(),
+         phone,
+         email,
+         otp,
+         createdAt: new Date().toISOString(),
+         verified: false
+      },
+      ...prev
+    ]);
+    logActivity('create', 'otps', `OTP Code [${otp}] created & sent for phone tracker: ${phone} (Email: ${email || 'N/A'})`);
+  };
+
+  const deleteOTP = (id: string) => {
+    const otpRec = otps.find(o => o.id === id);
+    const details = otpRec ? `Deleted OTP code: [${otpRec.otp}] for phone: ${otpRec.phone || 'N/A'}` : `Deleted OTP ID: ${id}`;
+    setOtps(prev => prev.map(o => o.id === id ? { ...o, deleted: true } : o));
+    logActivity('delete', 'otps', details);
+  };
 
   if (!isDbLoaded) {
     return (
@@ -640,8 +911,25 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <ShopContext.Provider value={{
-      products, orders, coupons, cart, slides, categoryBanners, lookbook, subscribers, contactMessages, popupAds, homeAds, faqs, policies, isAdminAuth,
-      currentAdmin, admins,
+      products: products.filter(p => !p.deleted), 
+      orders: orders.filter(o => !o.deleted), 
+      coupons: coupons.filter(c => !c.deleted), 
+      cart, 
+      slides: slides.filter(s => !s.deleted), 
+      categoryBanners: categoryBanners.filter(b => !b.deleted), 
+      lookbook: lookbook.filter(l => !l.deleted), 
+      subscribers: subscribers.filter(s => !s.deleted), 
+      contactMessages: contactMessages.filter(m => !m.deleted), 
+      popupAds: popupAds.filter(a => !a.deleted), 
+      homeAds: homeAds.filter(a => !a.deleted), 
+      faqs: faqs.filter(f => !f.deleted), 
+      policies: policies.filter(p => !p.deleted), 
+      isAdminAuth,
+      currentAdmin, 
+      admins: admins.filter(a => a.isActive !== false), 
+      otps: otps.filter(o => !o.deleted), 
+      activityLogs, 
+      logActivity,
       addToCart, removeFromCart, updateCartQuantity, clearCart, placeOrder,
       loginAdmin, logoutAdmin, addAdmin, updateAdmin, deleteAdmin, addProduct, updateProduct, deleteProduct,
       addSlide, updateSlide, deleteSlide, addCategoryBanner, updateCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage,
@@ -650,7 +938,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addSubscriber, deleteSubscriber, addContactMessage, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd,
       addHomeAd, deleteHomeAd, updateHomeAd,
       addFAQ, updateFAQ, deleteFAQ, addPolicy, updatePolicy, deletePolicy,
-      isDarkMode, toggleDarkMode, isCartOpen, setIsCartOpen
+      addOTP, deleteOTP,
+      isDarkMode, toggleDarkMode, isCartOpen, setIsCartOpen,
+      wishlist, toggleWishlist,
+      reviews: reviews.filter(r => !r.deleted), addReview, updateReviewStatus, deleteReview
     }}>
       {children}
     </ShopContext.Provider>

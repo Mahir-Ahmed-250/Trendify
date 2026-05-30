@@ -41,7 +41,7 @@ export default function Home() {
     >
       {/* Hero Carousel */}
       <div className="px-4 sm:px-6 lg:px-8 pt-6 max-w-screen-2xl mx-auto w-full">
-        <div className="relative h-[60vh] w-full overflow-hidden bg-gray-900 rounded-3xl group">
+        <div className="relative h-[45vh] sm:h-[60vh] w-full overflow-hidden bg-gray-900 rounded-3xl group">
         <AnimatePresence initial={false}>
           {slides.map((slide, index) => (
             index === currentSlide && (
@@ -72,7 +72,7 @@ export default function Home() {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.2, duration: 0.8 }}
-                    className="text-4xl md:text-7xl font-black text-white leading-none mb-4 uppercase"
+                    className="text-2xl sm:text-5xl md:text-7xl font-black text-white leading-none mb-3 sm:mb-4 uppercase"
                   >
                     {slide.title}
                   </motion.h1>
@@ -80,7 +80,7 @@ export default function Home() {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.4, duration: 0.8 }}
-                    className="text-sm md:text-lg text-gray-200 mb-8 max-w-2xl font-medium"
+                    className="text-xs sm:text-base md:text-lg text-gray-200 mb-6 sm:mb-8 max-w-2xl font-medium"
                   >
                     {slide.subtitle}
                   </motion.p>

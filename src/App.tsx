@@ -21,7 +21,10 @@ import FAQ from './pages/FAQ';
 import Policies from './pages/Policies';
 import ShippingPolicy from './pages/ShippingPolicy';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import Wishlist from './pages/Wishlist';
 import CartSidebar from './components/CartSidebar';
+
+import FloatingButtons from './components/FloatingButtons';
 
 function RootLayout() {
   return (
@@ -32,6 +35,7 @@ function RootLayout() {
         <Outlet />
       </main>
       <Footer />
+      <FloatingButtons />
     </div>
   );
 }
@@ -54,6 +58,7 @@ export default function App() {
             <Route path="policies" element={<Policies />} />
             <Route path="shipping-policy" element={<ShippingPolicy />} />
             <Route path="privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="wishlist" element={<Wishlist />} />
           </Route>
           {/* Admin has its own layout without standard footer if we want, but let's keep it simple. */}
           <Route path="/admin" element={<div className="flex flex-col min-h-screen bg-white transition-colors duration-300"><Navbar /><div className="flex-1 flex min-h-0"><AdminDashboard /></div></div>} />

@@ -239,7 +239,7 @@ export default function Shop() {
                 </p>
               ) : (
                 <p className="text-gray-500 text-sm font-medium flex items-center gap-2">
-                  Browse our full range of premium t-shirts
+                  Browse our full range of premium collections
                   <span className="text-[10px] uppercase tracking-widest font-bold bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
                      {filteredProducts.length} Items
                   </span>
@@ -283,7 +283,7 @@ export default function Shop() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredProducts.map(product => (
                 <ProductCard key={product.id} product={product} />
               ))}

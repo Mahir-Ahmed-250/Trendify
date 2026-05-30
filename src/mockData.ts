@@ -78,7 +78,7 @@ export const initialProducts: Product[] = [
     isHotSale: true,
     description: 'Perfect classic white t-shirt for everyday wear, made with 100% cotton.',
     category: 'Basic',
-    code: 'TS-1001',
+    code: 'TY-1001',
     stock: 50
   },
   {
@@ -89,7 +89,7 @@ export const initialProducts: Product[] = [
     isHotSale: true,
     description: 'Sleek dark design, breathable fabric.',
     category: 'Basic',
-    code: 'TS-1002',
+    code: 'TY-1002',
     stock: 50
   },
   {
@@ -100,7 +100,7 @@ export const initialProducts: Product[] = [
     isHotSale: false,
     description: 'Stylish vintage printed t-shirt.',
     category: 'Graphic',
-    code: 'TS-1003',
+    code: 'TY-1003',
     stock: 50
   },
   {
@@ -111,7 +111,7 @@ export const initialProducts: Product[] = [
     isHotSale: true,
     description: 'Trendy oversized fit, very comfortable.',
     category: 'Oversized',
-    code: 'TS-1004',
+    code: 'TY-1004',
     stock: 50
   },
   {
@@ -122,7 +122,7 @@ export const initialProducts: Product[] = [
     isHotSale: false,
     description: 'Striped retro pattern.',
     category: 'Basic',
-    code: 'TS-1005',
+    code: 'TY-1005',
     stock: 50
   },
   {
@@ -133,7 +133,7 @@ export const initialProducts: Product[] = [
     isHotSale: false,
     description: 'Modern art graphic printed.',
     category: 'Graphic',
-    code: 'TS-1006',
+    code: 'TY-1006',
     stock: 50
   }
 ];

@@ -5,6 +5,7 @@ export interface Slide {
   image: string;
   tagText?: string;
   link?: string;
+  deleted?: boolean;
 }
 
 export interface CategoryBanner {
@@ -13,6 +14,7 @@ export interface CategoryBanner {
   subtitle: string;
   image: string;
   link: string;
+  deleted?: boolean;
 }
 
 export interface LookbookImage {
@@ -24,12 +26,14 @@ export interface LookbookImage {
   heightPercent?: string; // e.g. '25%', '50%', '100%'
   serial: number;
   title?: string;
+  deleted?: boolean;
 }
 
 export interface Subscriber {
   id: string;
   email: string;
   date: string;
+  deleted?: boolean;
 }
 
 export interface ContactMessage {
@@ -38,6 +42,7 @@ export interface ContactMessage {
   email: string;
   message: string;
   date: string;
+  deleted?: boolean;
 }
 
 export interface PopupAd {
@@ -46,6 +51,7 @@ export interface PopupAd {
   linkUrl: string;
   isActive: boolean;
   pages: string[]; 
+  deleted?: boolean;
 }
 
 export interface HomeAd {
@@ -55,6 +61,7 @@ export interface HomeAd {
   subtitle?: string;
   linkUrl: string;
   isActive: boolean;
+  deleted?: boolean;
 }
 
 export interface Product {
@@ -72,12 +79,14 @@ export interface Product {
   serial?: number;
   stock: number;
   oldPrice?: number;
+  deleted?: boolean;
 }
 
 export interface FAQItem {
   id: string;
   question: string;
   answer: string;
+  deleted?: boolean;
 }
 
 export interface PolicyItem {
@@ -85,6 +94,7 @@ export interface PolicyItem {
   key: 'shipping_returns' | 'privacy_policy' | string;
   title: string;
   content: string;
+  deleted?: boolean;
 }
 
 export interface CartItem extends Product {
@@ -109,6 +119,7 @@ export interface Coupon {
   isActive: boolean;
   startDate?: string;
   expiryDate?: string;
+  deleted?: boolean;
 }
 
 export interface Order {
@@ -122,6 +133,19 @@ export interface Order {
   date: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   notes?: string;
+  deleted?: boolean;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  orderId: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  status: 'pending' | 'approved' | 'hidden';
+  date: string;
+  deleted?: boolean;
 }
 
 export interface AdminPermissions {
@@ -137,6 +161,31 @@ export interface AdminPermissions {
   ads: boolean;
   faqs: boolean;
   policies: boolean;
+  otps?: boolean;
+  otpsDelete?: boolean;
+  activityLogs?: boolean;
+  reviews?: boolean;
+}
+
+export interface ActivityLog {
+  id: string;
+  adminId: string;
+  adminName: string;
+  adminEmail: string;
+  actionType: 'create' | 'update' | 'delete' | 'auth' | 'other';
+  targetModule: string;
+  details: string;
+  timestamp: string;
+}
+
+export interface OTPRecord {
+  id: string;
+  phone?: string;
+  email?: string;
+  otp: string;
+  createdAt: string;
+  verified: boolean;
+  deleted?: boolean;
 }
 
 export interface AdminUser {
@@ -147,4 +196,5 @@ export interface AdminUser {
   image?: string;
   role: 'super' | 'admin';
   permissions: AdminPermissions;
+  isActive?: boolean;
 }

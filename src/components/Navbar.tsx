@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Search, ChevronRight, Moon, Sun, UserCog } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, ChevronRight, Moon, Sun, UserCog, Heart } from 'lucide-react';
 import { useShop } from '../ShopContext';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function Navbar() {
-  const { cart, products, isDarkMode, toggleDarkMode, setIsCartOpen } = useShop();
+  const { cart, products, isDarkMode, toggleDarkMode, setIsCartOpen, isAdminAuth, wishlist } = useShop();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,7 +48,7 @@ export default function Navbar() {
 
   return (
     <nav className="bg-white dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-[100] transition-colors">
-      <div className="px-8 py-4">
+      <div className="px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full py-4">
         <div className="flex justify-between items-center">
           {/* Logo */}
           <div className="flex items-center">
@@ -128,14 +128,23 @@ export default function Navbar() {
  
           {/* Cart, Admin */}
           <div className="hidden md:flex items-center space-x-6">
-            {/* <Link 
-              to="/admin" 
-              className="text-gray-400 hover:text-black dark:hover:text-white transition-transform hover:scale-105 flex items-center gap-1.5"
-              title="Admin Dashboard"
-            >
-              <UserCog className="h-5 w-5" />
+            <Link to="/wishlist" className="text-gray-400 hover:text-red-500 transition-colors relative">
+              <Heart className="h-6 w-6" />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                  {wishlist.length}
+                </span>
+              )}
             </Link>
-  */}
+            {isAdminAuth && (
+              <Link 
+                to="/admin" 
+                className="text-gray-400 hover:text-black dark:hover:text-white transition-transform hover:scale-105 flex items-center gap-1.5"
+                title="Admin Dashboard"
+              >
+                <UserCog className="h-5 w-5" />
+              </Link>
+            )}
             <button onClick={() => setIsCartOpen(true)} className="text-gray-900 dark:text-white hover:text-black relative flex items-center">
               <ShoppingCart className="h-6 w-6" />
               {cartItemCount > 0 && (
@@ -148,13 +157,23 @@ export default function Navbar() {
  
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center space-x-4">
-            <Link 
-              to="/admin" 
-              className="text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white flex items-center"
-              title="Admin Dashboard"
-            >
-              <UserCog className="h-5 w-5" />
+            <Link to="/wishlist" className="text-gray-900 dark:text-white relative">
+              <Heart className="h-6 w-6" />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                  {wishlist.length}
+                </span>
+              )}
             </Link>
+            {isAdminAuth && (
+              <Link 
+                to="/admin" 
+                className="text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white flex items-center"
+                title="Admin Dashboard"
+              >
+                <UserCog className="h-5 w-5" />
+              </Link>
+            )}
             <button onClick={() => setIsCartOpen(true)} className="text-gray-900 dark:text-white relative">
               <ShoppingCart className="h-6 w-6" />
               {cartItemCount > 0 && (
@@ -182,7 +201,7 @@ export default function Navbar() {
             exit={{ height: 0, opacity: 0 }}
             className="md:hidden border-t dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-950"
           >
-            <div className="px-8 pt-4 pb-6 space-y-4">
+            <div className="px-4 sm:px-6 pt-4 pb-6 space-y-4">
               <form onSubmit={handleSearch} className="relative mb-4">
                 <input
                   type="text"
@@ -197,7 +216,9 @@ export default function Navbar() {
               <Link to="/shop" onClick={() => setIsMobileMenuOpen(false)} className="block text-gray-800 dark:text-gray-200 font-bold py-2">Shop</Link>
               <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)} className="block text-gray-800 dark:text-gray-200 font-bold py-2">Contact</Link>
               <Link to="/track-order" onClick={() => setIsMobileMenuOpen(false)} className="block text-gray-800 dark:text-gray-200 font-bold py-2">Track Order</Link>
-              <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block text-[10px] uppercase tracking-widest font-black text-gray-400 dark:text-gray-500 py-2">Admin Dashboard</Link>
+              {isAdminAuth && (
+                <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="block text-[10px] uppercase tracking-widest font-black text-gray-400 dark:text-gray-500 py-2">Admin Dashboard</Link>
+              )}
             </div>
           </motion.div>
         )}

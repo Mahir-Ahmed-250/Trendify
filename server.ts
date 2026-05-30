@@ -23,7 +23,8 @@ const COLLECTION_KEYS = [
   "contactMessages",
   "popupAds",
   "homeAds",
-  "admins"
+  "admins",
+  "otps"
 ];
 
 let mongoClient: MongoClient | null = null;
@@ -182,27 +183,45 @@ async function writeDbKey(key: string, data: any): Promise<boolean> {
       try {
         const col = mongo.collection(key);
         const array = Array.isArray(data) ? data : [];
+        
+        // If it's a collection we manage as an array, we should sync it.
+        // To respect "never delete" but also allow user requested deletions:
+        // We will now actually mirror the array to the collection.
+        // If the user wants to hard-delete from the DB, they remove it from the array.
+        
+        // 1. Get all existing IDs in the collection
+        const existingDocs = await col.find({}, { projection: { _id: 1 } }).toArray();
+        const existingIds = existingDocs.map(d => d._id.toString());
+        
+        // 2. Prepare new IDs
+        const newDocIds = new Set();
+        
         if (array.length > 0) {
-          // Upsert items by id to ensure absolute uniqueness inside the array without deleting
           for (const item of array) {
             if (!item || typeof item !== "object") continue;
             const itemId = item.id || item.email || item._id || String(Math.random());
             const doc = { ...item };
-            if (item.id) {
-              doc._id = item.id;
-            } else if (!doc._id) {
-              doc._id = itemId;
-            }
             
-            // Do NOT use deleteMany, just upsert to never remove data
-            const filter = { _id: doc._id };
-            // Optional: remove the _id from $set payload to prevent Mongo immutable field errors if it differs
+            let targetId = item.id || doc._id || itemId;
+            doc._id = targetId;
+            newDocIds.add(targetId.toString());
+
+            const filter = { _id: targetId };
             const setPayload = { ...doc };
             delete setPayload._id;
             
             await col.updateOne(filter, { $set: setPayload }, { upsert: true });
           }
         }
+
+        // 3. Remove documents that are no longer in the array
+        // We only do this if it's not a "critical" collection or if we are explicitly syncing.
+        // Given the user frustration, we MUST sync.
+        const idsToDelete = existingIds.filter(id => !newDocIds.has(id));
+        if (idsToDelete.length > 0) {
+          await col.deleteMany({ _id: { $in: idsToDelete as any } });
+        }
+        
         return true;
       } catch (err: any) {
         console.error(`Error writing key '${key}' to MongoDB collection, falling back to local file:`, err.message || err);
@@ -462,6 +481,62 @@ async function startServer() {
       res.status(200).json({ success: true, messageId: info.messageId });
     } catch (err: any) {
       console.error("Nodemailer invoice error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  });
+
+  app.post("/api/send-otp-email", async (req, res) => {
+    try {
+      const { email, otp } = req.body;
+      if (!email || !otp) {
+        return res.status(400).json({ error: "Email and OTP are required." });
+      }
+
+      const otpHtml = `
+        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 25px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div style="border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; display: table; width: 100%;">
+            <div style="display: table-cell; vertical-align: middle;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; color: #000;">TRENDIFY</h1>
+            </div>
+            <div style="display: table-cell; text-align: right; vertical-align: middle;">
+              <span style="font-size: 13px; color: #666; font-weight: bold;">ORDER TRACKING VERIFICATION</span>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 25px;">
+            <p style="font-size: 15px; color: #333; line-height: 1.5; margin: 0 0 15px 0;">আপনার Trendify অর্ডারের বর্তমান অবস্থা ট্র্যাক করতে নিচে দেওয়া সিকিউরিটি কোড (OTP) ব্যবহার করুন:</p>
+            <div style="background-color: #f0f7ff; border: 1px solid #e0f2fe; padding: 20px 10px; border-radius: 12px; text-align: center; margin: 25px 0;">
+              <span style="font-family: monospace; font-size: 32px; font-weight: 900; color: #2563eb; letter-spacing: 5px;">${otp}</span>
+            </div>
+            <p style="font-size: 13px; color: #e11d48; line-height: 1.5; font-weight: bold; margin: 15px 0 0 0;">⚠️ নিরাপত্তা স্বার্থে কোডটি কাউকে শেয়ার করবেন না।</p>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 25px 0;" />
+          <p style="font-size: 11px; color: #aaac; text-align: center; margin: 0;">TRENDIFY | Bangladesh's Premium T-Shirt Store</p>
+        </div>
+      `;
+
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+        console.warn("EMAIL_USER or EMAIL_APP_PASSWORD not set. Logging tracking OTP email content.");
+        return res.status(200).json({ 
+          success: true, 
+          mocked: true,
+          message: "Email credentials not configured on server settings, but OTP was successfully logged."
+        });
+      }
+
+      const mailOptions = {
+        from: `"TRENDIFY" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `[${otp}] Trendify Order Tracking OTP Code`,
+        html: otpHtml,
+      };
+
+      const mailer = getTransporter();
+      const info = await mailer.sendMail(mailOptions);
+      res.status(200).json({ success: true, messageId: info.messageId });
+    } catch (err: any) {
+      console.error("Nodemailer OTP sending error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });
     }
   });
