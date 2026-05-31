@@ -21,7 +21,7 @@ export default function Contact() {
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-4 uppercase">Contact Us</h1>
           <p className="text-gray-500 font-medium">
-            Have a question about our t-shirts, sizing, or an existing order? We'd love to hear from you.
+            Have a question about our products, sizing, or an existing order? We'd love to hear from you.
           </p>
         </div>
 

@@ -772,8 +772,8 @@ export default function AdminDashboard() {
   const unreadPendingReviews = pendingReviews.filter(r => !readReviewIds.includes(r.id));
 
   // Analytics
-  const deliveredOrders = orders.filter(o => o.status === 'delivered');
-  const orderItems = deliveredOrders.flatMap(o => o.items);
+  const activeOrders = orders.filter(o => o.status !== 'cancelled');
+  const orderItems = activeOrders.flatMap(o => o.items);
   const salesMap = orderItems.reduce((acc, item) => {
     acc[item.id] = (acc[item.id] || 0) + item.quantity;
     return acc;
@@ -811,7 +811,7 @@ export default function AdminDashboard() {
 
     const filtered = orders.filter(o => {
       const orderDate = new Date(o.date);
-      return orderDate >= startLimit && orderDate <= endLimit;
+      return o.status !== 'cancelled' && orderDate >= startLimit && orderDate <= endLimit;
     });
 
     const dailyData: { [key: string]: number } = {};
@@ -2371,7 +2371,7 @@ export default function AdminDashboard() {
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              <SummaryCard title="Orders" count={orders.length} icon={ShoppingBag} />
+              <SummaryCard title="Orders" count={orders.filter(o => o.status !== 'cancelled').length} icon={ShoppingBag} />
               <SummaryCard title="Pending" count={orders.filter(o => o.status === 'pending').length} icon={Package} />
               <SummaryCard title="Processing" count={orders.filter(o => o.status === 'processing').length} icon={Clock} />
               <SummaryCard title="Shipped" count={orders.filter(o => o.status === 'shipped').length} icon={Truck} />
@@ -2394,7 +2394,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Sales</p>
-                   <p className="text-xl font-black">৳{orders.reduce((acc, o) => acc + o.total, 0).toLocaleString()}</p>
+                   <p className="text-xl font-black">৳{activeOrders.reduce((acc, o) => acc + o.total, 0).toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -2420,7 +2420,6 @@ export default function AdminDashboard() {
                         { name: 'Processing', count: orders.filter(o => o.status === 'processing').length, color: '#3b82f6' },
                         { name: 'Shipped', count: orders.filter(o => o.status === 'shipped').length, color: '#a855f7' },
                         { name: 'Delivered', count: orders.filter(o => o.status === 'delivered').length, color: '#10b981' },
-                        { name: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length, color: '#ef4444' },
                       ]}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                     >
@@ -2437,7 +2436,6 @@ export default function AdminDashboard() {
                           { name: 'Processing', count: orders.filter(o => o.status === 'processing').length, color: '#3b82f6' },
                           { name: 'Shipped', count: orders.filter(o => o.status === 'shipped').length, color: '#a855f7' },
                           { name: 'Delivered', count: orders.filter(o => o.status === 'delivered').length, color: '#10b981' },
-                          { name: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length, color: '#ef4444' },
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
