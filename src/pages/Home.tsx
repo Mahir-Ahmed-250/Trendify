@@ -4,14 +4,22 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, ShieldCheck, Truck, RotateCcw } from 'lucide-react';
 import { useShop } from '../ShopContext';
 import ProductCard from '../components/ProductCard';
+import { ProductCardSkeleton } from '../components/Skeleton';
 import Swal from 'sweetalert2';
 
 export default function Home() {
   const { products, slides, categoryBanners, lookbook, homeAds, addSubscriber } = useShop();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [subEmail, setSubEmail] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const hotProducts = products.filter(p => p.isHotSale).slice(0, 4);
+
+  useEffect(() => {
+    // Simulate initial loading for skeleton effect
+    const timer = setTimeout(() => setLoading(false), 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +127,13 @@ export default function Home() {
       </div>
 
       {/* Hot Sales Section */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full">
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, margin: "-100px" }}
+        transition={{ duration: 0.6 }}
+        className="py-12 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full"
+      >
         <div className="flex items-end justify-between mb-6">
           <h2 className="text-xl font-bold tracking-tight uppercase">Hot Sales <span className="text-red-500 ml-2">•</span></h2>
           <Link to="/shop" className="text-xs font-bold text-gray-400 uppercase underline underline-offset-4 hover:text-black">
@@ -128,9 +142,13 @@ export default function Home() {
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {hotProducts.map(product => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+          {loading ? (
+             Array(4).fill(0).map((_, i) => <ProductCardSkeleton key={i} />)
+          ) : (
+            hotProducts.map(product => (
+              <ProductCard key={product.id} product={product} />
+            ))
+          )}
         </div>
         
         <div className="mt-8 sm:hidden flex justify-center">
@@ -138,10 +156,16 @@ export default function Home() {
             View All
           </Link>
         </div>
-      </section>
+      </motion.section>
 
       {/* Categories / Extra Banners */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full">
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, margin: "-100px" }}
+        transition={{ duration: 0.6 }}
+        className="py-12 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {categoryBanners.map(banner => (
             <div key={banner.id} className="relative h-64 md:h-80 rounded-3xl overflow-hidden group">
@@ -157,10 +181,16 @@ export default function Home() {
             </div>
           ))}
         </div>
-      </section>
+      </motion.section>
 
       {/* Recommended/Latest Section */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full">
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, margin: "-100px" }}
+        transition={{ duration: 0.6 }}
+        className="py-12 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full"
+      >
         <div className="flex items-end justify-between mb-6 border-b border-gray-100 pb-4">
           <h2 className="text-xl font-bold tracking-tight uppercase">Our Collection</h2>
           <Link to="/shop" className="text-xs font-bold text-gray-400 uppercase underline underline-offset-4 hover:text-black hidden sm:block">
@@ -169,13 +199,17 @@ export default function Home() {
         </div>
         
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
-          {products
-            .filter(p => p.isCollection)
-            .sort((a, b) => (a.serial || 0) - (b.serial || 0))
-            .slice(0, 5)
-            .map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+          {loading ? (
+             Array(5).fill(0).map((_, i) => <ProductCardSkeleton key={i} />)
+          ) : (
+            products
+              .filter(p => p.isCollection)
+              .sort((a, b) => (a.serial || 0) - (b.serial || 0))
+              .slice(0, 5)
+              .map(product => (
+                <ProductCard key={product.id} product={product} />
+              ))
+          )}
         </div>
         
         <div className="mt-8 flex justify-center sm:hidden">
@@ -183,11 +217,17 @@ export default function Home() {
             View All
           </Link>
         </div>
-      </section>
+      </motion.section>
 
       {/* Dynamic Home Promo Ads Section (পাবলিশড হোম পেইজ বিজ্ঞাপনসমূহ) */}
       {homeAds && homeAds.filter(ad => ad.isActive).length > 0 && (
-        <section className="py-8 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full">
+        <motion.section 
+          initial={{ opacity: 0, scale: 0.98 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: false, margin: "-100px" }}
+          transition={{ duration: 0.6 }}
+          className="py-8 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
             {homeAds.filter(ad => ad.isActive).map(ad => (
               <Link 
@@ -222,11 +262,17 @@ export default function Home() {
               </Link>
             ))}
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* Lookbook / Modeling Section */}
-      <section className="py-16 bg-white border-t border-gray-100 mt-12">
+      <motion.section 
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: false }}
+        transition={{ duration: 0.8 }}
+        className="py-16 bg-white border-t border-gray-100 mt-12"
+      >
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="flex flex-col items-center text-center mb-12">
             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Style Inspiration</span>
@@ -263,30 +309,54 @@ export default function Home() {
               ))}
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Features/Trust markers */}
-      <section className="bg-white border-t border-gray-100 py-16 mt-8">
+      <motion.section 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false }}
+        transition={{ duration: 0.6 }}
+        className="bg-white border-t border-gray-100 py-16 mt-8"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-gray-200">
-            <div className="py-4 md:py-0 px-6 flex flex-col items-center">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              whileInView={{ opacity: 1, scale: 1, y: 0 }}
+              viewport={{ once: false }}
+              transition={{ delay: 0.1 }}
+              className="py-4 md:py-0 px-6 flex flex-col items-center"
+            >
               <ShieldCheck className="h-10 w-10 text-gray-900 mb-4" />
               <h3 className="text-xl font-bold mb-2">Premium Quality</h3>
               <p className="text-gray-500 text-sm">Crafted with the finest organic cotton for ultimate comfort.</p>
-            </div>
-            <div className="py-4 md:py-0 px-6 flex flex-col items-center">
+            </motion.div>
+            <motion.div 
+               initial={{ opacity: 0, scale: 0.9, y: 20 }}
+               whileInView={{ opacity: 1, scale: 1, y: 0 }}
+               viewport={{ once: false }}
+               transition={{ delay: 0.2 }}
+               className="py-4 md:py-0 px-6 flex flex-col items-center"
+            >
               <Truck className="h-10 w-10 text-gray-900 mb-4" />
               <h3 className="text-xl font-bold mb-2">Fast Delivery</h3>
               <p className="text-gray-500 text-sm">Nationwide delivery within 2-3 business days.</p>
-            </div>
-            <div className="py-4 md:py-0 px-6 flex flex-col items-center">
+            </motion.div>
+            <motion.div 
+               initial={{ opacity: 0, scale: 0.9, y: 20 }}
+               whileInView={{ opacity: 1, scale: 1, y: 0 }}
+               viewport={{ once: false }}
+               transition={{ delay: 0.3 }}
+               className="py-4 md:py-0 px-6 flex flex-col items-center"
+            >
               <RotateCcw className="h-10 w-10 text-gray-900 mb-4" />
               <h3 className="text-xl font-bold mb-2">Easy Returns</h3>
               <p className="text-gray-500 text-sm">7-day hassle-free return policy if you change your mind.</p>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Newsletter Section */}
       <section className="relative py-24 sm:px-6 lg:px-8 w-full mt-12 overflow-hidden mx-auto" style={{ clipPath: 'polygon(0 8%, 100% 0, 100% 100%, 0 100%)' }}>

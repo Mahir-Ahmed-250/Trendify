@@ -1,14 +1,20 @@
-import React, { useMemo } from 'react';
-import { ShoppingCart, Heart, Star } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ShoppingCart, Heart, Star, Check } from 'lucide-react';
 import { Product } from '../types';
 import { useShop } from '../ShopContext';
 import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 
 export default function ProductCard({ product }: { product: Product, key?: React.Key }) {
-  const { addToCart, setIsCartOpen, wishlist, toggleWishlist, reviews } = useShop();
+  const { addToCart, wishlist, toggleWishlist, reviews, cart } = useShop();
+  const [isAdded, setIsAdded] = useState(false);
 
   const isOutOfStock = (product.stock || 0) <= 0;
   const isWishlisted = wishlist.includes(product.id);
+
+  const isProductInCart = useMemo(() => {
+    return cart ? cart.some(item => item.id === product.id) : false;
+  }, [cart, product.id]);
 
   const productReviews = useMemo(() => {
     return reviews.filter(r => r.productId === product.id && r.status === 'approved');
@@ -21,7 +27,18 @@ export default function ProductCard({ product }: { product: Product, key?: React
   }, [productReviews]);
 
   return (
-    <div className="bg-white dark:bg-gray-900 p-3 rounded-2xl flex flex-col border border-gray-100 dark:border-gray-800 group relative relative hover:shadow-xl hover:shadow-black/5 transition-shadow">
+    <motion.div 
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: false, margin: "-50px" }}
+      transition={{ 
+        duration: 0.5,
+        type: "spring",
+        stiffness: 100,
+        damping: 20
+      }}
+      className="bg-white dark:bg-gray-900 p-3 rounded-2xl flex flex-col border border-gray-100 dark:border-gray-800 group relative relative hover:shadow-xl hover:shadow-black/5 transition-shadow"
+    >
       <Link to={`/product/${product.id}`} className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-xl mb-3 flex items-center justify-center relative overflow-hidden block">
         <img
           src={product.image}
@@ -93,10 +110,46 @@ export default function ProductCard({ product }: { product: Product, key?: React
           )}
         </div>
       </Link>
-      <div className="mt-auto">
+      <div className="mt-auto flex gap-1.5">
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isOutOfStock && !isAdded && !isProductInCart) {
+              addToCart(product, 1);
+              setIsAdded(true);
+              setTimeout(() => setIsAdded(false), 2000);
+            }
+          }}
+          disabled={isOutOfStock || isAdded || isProductInCart}
+          className={`flex-1 py-2.5 px-1.5 text-[9px] font-black uppercase tracking-tighter rounded-lg transition-all flex items-center justify-center gap-0.5 border ${
+            isOutOfStock 
+              ? 'bg-gray-50 border-gray-100 text-gray-300 dark:bg-gray-800 dark:border-gray-700 cursor-not-allowed' 
+              : (isAdded || isProductInCart)
+                ? 'bg-green-600 border-green-600 text-white dark:bg-green-700 dark:border-green-700 cursor-default select-none'
+                : 'bg-white text-black border-black hover:bg-gray-50 dark:bg-gray-800 dark:text-white dark:border-gray-700 dark:hover:bg-gray-700 active:scale-95'
+          }`}
+        >
+          {(isAdded || isProductInCart) ? (
+            <>
+              <Check size={10} className="shrink-0" />
+              <span className="truncate">Added to Cart</span>
+            </>
+          ) : (
+            <>
+              <ShoppingCart size={11} className="shrink-0" />
+              <span>Cart</span>
+            </>
+          )}
+        </button>
         <Link
-          to={`/product/${product.id}`}
-          className={`w-full py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg active:scale-95 transition-all text-center block ${
+          to={isOutOfStock ? '#' : `/product/${product.id}`}
+          onClick={(e) => {
+            if (isOutOfStock) {
+              e.preventDefault();
+            }
+          }}
+          className={`flex-1 py-2.5 px-2 text-[10px] font-black uppercase tracking-tight rounded-lg active:scale-95 transition-all text-center block ${
             isOutOfStock 
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
               : 'bg-black text-white hover:bg-gray-800'
@@ -105,6 +158,6 @@ export default function ProductCard({ product }: { product: Product, key?: React
           {isOutOfStock ? 'Sold Out' : 'Buy Now'}
         </Link>
       </div>
-    </div>
+    </motion.div>
   );
 }

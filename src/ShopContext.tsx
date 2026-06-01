@@ -22,9 +22,12 @@ interface ShopContextType {
   admins: AdminUser[];
   activityLogs: ActivityLog[];
   logActivity: (actionType: ActivityLog['actionType'], targetModule: string, details: string, adminOverride?: AdminUser) => void;
+  getProductPriceForSize: (product: Product, size: string) => number;
+  getProductStockForSize: (product: Product, size: string) => number;
   addToCart: (product: Product, quantity?: number, selectedSize?: string) => void;
   removeFromCart: (productId: string, selectedSize?: string) => void;
   updateCartQuantity: (productId: string, quantity: number, selectedSize?: string) => void;
+  updateCartItemSize: (productId: string, oldSize: string, newSize: string) => void;
   clearCart: () => void;
   placeOrder: (customer: CustomerInfo, couponCode?: string) => { success: boolean; orderId?: string; error?: string };
   // Admin actions
@@ -50,6 +53,7 @@ interface ShopContextType {
   deleteCoupon: (id: string) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   updateOrderNotes: (orderId: string, notes: string) => void;
+  updateOrder: (order: Order) => void;
   deleteOrder: (id: string) => void;
   addSubscriber: (email: string) => void;
   deleteSubscriber: (id: string) => void;
@@ -538,45 +542,102 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const getProductPriceForSize = (product: Product, size: string): number => {
+    if (product?.sizePrices && product.sizePrices[size] !== undefined && product.sizePrices[size] > 0) {
+      return product.sizePrices[size];
+    }
+    return product.price;
+  };
+
+  const getProductStockForSize = (product: Product, size: string): number => {
+    if (product?.sizeStocks && product.sizeStocks[size] !== undefined) {
+      return product.sizeStocks[size];
+    }
+    return product ? (product.stock !== undefined ? product.stock : 0) : 0;
+  };
+
   const addToCart = (product: Product, quantity = 1, selectedSize?: string) => {
+    const size = selectedSize || 'M';
+    const priceForSize = getProductPriceForSize(product, size);
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id && item.selectedSize === selectedSize);
+      const existing = prev.find(item => item.id === product.id && (item.selectedSize || 'M') === size);
       const currentQty = existing ? existing.quantity : 0;
       const totalRequested = currentQty + quantity;
       
-      // Stock check
-      const stock = product.stock || 0;
+      // Size-Specific Stock check
+      const stock = getProductStockForSize(product, size);
       if (totalRequested > stock) {
         // If we can't fulfill the full request, just add up to stock
         const allowedAdd = Math.max(0, stock - currentQty);
         if (allowedAdd <= 0) return prev;
         
         if (existing) {
-          return prev.map(item => (item.id === product.id && item.selectedSize === selectedSize) ? { ...item, quantity: stock } : item);
+          return prev.map(item => (item.id === product.id && (item.selectedSize || 'M') === size) ? { ...item, quantity: stock, price: priceForSize } : item);
         }
-        return [...prev, { ...product, quantity: stock, selectedSize }];
+        return [...prev, { ...product, price: priceForSize, quantity: stock, selectedSize: size }];
       }
 
       if (existing) {
-        return prev.map(item => (item.id === product.id && item.selectedSize === selectedSize) ? { ...item, quantity: item.quantity + quantity } : item);
+        return prev.map(item => (item.id === product.id && (item.selectedSize || 'M') === size) ? { ...item, quantity: item.quantity + quantity, price: priceForSize } : item);
       }
-      return [...prev, { ...product, quantity, selectedSize }];
+      return [...prev, { ...product, price: priceForSize, quantity, selectedSize: size }];
     });
   };
 
   const removeFromCart = (productId: string, selectedSize?: string) => {
-    setCart(prev => prev.filter(item => !(item.id === productId && item.selectedSize === selectedSize)));
+    const size = selectedSize || 'M';
+    setCart(prev => prev.filter(item => !(item.id === productId && (item.selectedSize || 'M') === size)));
   };
 
   const updateCartQuantity = (productId: string, quantity: number, selectedSize?: string) => {
     if (quantity < 1) return;
+    const size = selectedSize || 'M';
     setCart(prev => prev.map(item => {
-      if (item.id === productId && item.selectedSize === selectedSize) {
-        const stock = item.stock || 0;
-        return { ...item, quantity: Math.min(quantity, stock) };
+      if (item.id === productId && (item.selectedSize || 'M') === size) {
+        const stock = getProductStockForSize(item, size);
+        const priceForSize = getProductPriceForSize(item, size);
+        return { ...item, quantity: Math.min(quantity, stock), price: priceForSize };
       }
       return item;
     }));
+  };
+
+  const updateCartItemSize = (productId: string, oldSize: string, newSize: string) => {
+    const sizeOld = oldSize || 'M';
+    const sizeNew = newSize || 'M';
+    if (sizeOld === sizeNew) return;
+
+    setCart(prev => {
+      const itemIndex = prev.findIndex(item => item.id === productId && (item.selectedSize || 'M') === sizeOld);
+      if (itemIndex === -1) return prev;
+
+      const updatedItem = prev[itemIndex];
+      const priceNew = getProductPriceForSize(updatedItem, sizeNew);
+      const existingIndex = prev.findIndex((item, idx) => idx !== itemIndex && item.id === productId && (item.selectedSize || 'M') === sizeNew);
+
+      if (existingIndex !== -1) {
+        // Merge the quantities of both items up to stock limit
+        const existingItem = prev[existingIndex];
+        const stock = getProductStockForSize(updatedItem, sizeNew);
+        const mergedQty = Math.min(updatedItem.quantity + existingItem.quantity, stock);
+
+        // Update the existing item and remove the old item
+        return prev.map((item, idx) => {
+          if (idx === existingIndex) {
+            return { ...item, quantity: mergedQty, price: priceNew };
+          }
+          return item;
+        }).filter((_, idx) => idx !== itemIndex);
+      } else {
+        // Just change the size
+        return prev.map((item, idx) => {
+          if (idx === itemIndex) {
+            return { ...item, selectedSize: sizeNew, price: priceNew };
+          }
+          return item;
+        });
+      }
+    });
   };
 
   const clearCart = () => setCart([]);
@@ -628,9 +689,16 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       cart.forEach(item => {
         const productIndex = updated.findIndex(p => p.id === item.id);
         if (productIndex !== -1) {
+          const prod = updated[productIndex];
+          const sz = item.selectedSize || 'M';
+          const newSizeStocks = { ...(prod.sizeStocks || {}) };
+          if (newSizeStocks[sz] !== undefined) {
+            newSizeStocks[sz] = Math.max(0, (newSizeStocks[sz] || 0) - item.quantity);
+          }
           updated[productIndex] = {
-            ...updated[productIndex],
-            stock: Math.max(0, (updated[productIndex].stock || 0) - item.quantity)
+            ...prod,
+            stock: Math.max(0, (prod.stock || 0) - item.quantity),
+            sizeStocks: newSizeStocks
           };
         }
       });
@@ -718,9 +786,16 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           order.items.forEach(item => {
             const productIndex = updated.findIndex(p => p.id === item.id);
             if (productIndex !== -1) {
+              const prod = updated[productIndex];
+              const sz = item.selectedSize || 'M';
+              const newSizeStocks = { ...(prod.sizeStocks || {}) };
+              if (newSizeStocks[sz] !== undefined) {
+                newSizeStocks[sz] = (newSizeStocks[sz] || 0) + item.quantity;
+              }
               updated[productIndex] = {
-                ...updated[productIndex],
-                stock: (updated[productIndex].stock || 0) + item.quantity
+                ...prod,
+                stock: (prod.stock || 0) + item.quantity,
+                sizeStocks: newSizeStocks
               };
             }
           });
@@ -733,9 +808,16 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           order.items.forEach(item => {
             const productIndex = updated.findIndex(p => p.id === item.id);
             if (productIndex !== -1) {
+              const prod = updated[productIndex];
+              const sz = item.selectedSize || 'M';
+              const newSizeStocks = { ...(prod.sizeStocks || {}) };
+              if (newSizeStocks[sz] !== undefined) {
+                newSizeStocks[sz] = Math.max(0, (newSizeStocks[sz] || 0) - item.quantity);
+              }
               updated[productIndex] = {
-                ...updated[productIndex],
-                stock: Math.max(0, (updated[productIndex].stock || 0) - item.quantity)
+                ...prod,
+                stock: Math.max(0, (prod.stock || 0) - item.quantity),
+                sizeStocks: newSizeStocks
               };
             }
           });
@@ -755,6 +837,11 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteOrder = (id: string) => {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, deleted: true } : o));
     logActivity('delete', 'orders', `Deleted order: "${id}"`);
+  };
+
+  const updateOrder = (order: Order) => {
+    setOrders(prev => prev.map(o => o.id === order.id ? order : o));
+    logActivity('update', 'orders', `Customized details and items of order "${order.id}"`);
   };
 
   const addSlide = (slide: Omit<Slide, 'id'>) => {
@@ -930,11 +1017,13 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       otps: otps.filter(o => !o.deleted), 
       activityLogs, 
       logActivity,
-      addToCart, removeFromCart, updateCartQuantity, clearCart, placeOrder,
+      getProductPriceForSize,
+      getProductStockForSize,
+      addToCart, removeFromCart, updateCartQuantity, updateCartItemSize, clearCart, placeOrder,
       loginAdmin, logoutAdmin, addAdmin, updateAdmin, deleteAdmin, addProduct, updateProduct, deleteProduct,
       addSlide, updateSlide, deleteSlide, addCategoryBanner, updateCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage,
       addCoupon, updateCoupon, deleteCoupon,
-      updateOrderStatus, updateOrderNotes, deleteOrder,
+      updateOrderStatus, updateOrderNotes, updateOrder, deleteOrder,
       addSubscriber, deleteSubscriber, addContactMessage, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd,
       addHomeAd, deleteHomeAd, updateHomeAd,
       addFAQ, updateFAQ, deleteFAQ, addPolicy, updatePolicy, deletePolicy,

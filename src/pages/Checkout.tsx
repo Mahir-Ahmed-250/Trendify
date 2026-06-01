@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Ticket, Plus, Minus, Trash2, Loader2 } from 'lucide-react';
+import { Ticket, Plus, Minus, Trash2, Loader2 } from 'lucide-react';
 import { useShop } from '../ShopContext';
 import Swal from 'sweetalert2';
 import { motion } from 'motion/react';
+import SuccessAnimation from '../components/SuccessAnimation';
 
 const BANGLADESH_DISTRICTS = [
   { en: 'Bagerhat', bn: 'বাগেরহাট' },
@@ -73,7 +74,7 @@ const BANGLADESH_DISTRICTS = [
 ];
 
 export default function Checkout() {
-  const { cart, coupons, placeOrder, clearCart, updateCartQuantity, removeFromCart } = useShop();
+  const { cart, coupons, placeOrder, clearCart, updateCartQuantity, removeFromCart, updateCartItemSize } = useShop();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -99,9 +100,7 @@ export default function Checkout() {
   if (orderComplete.status) {
     return (
       <div className="flex-1 w-full max-w-3xl mx-auto px-4 py-20 text-center flex flex-col items-center">
-        <div className="bg-green-50 text-green-600 w-24 h-24 rounded-full flex items-center justify-center mb-6">
-          <CheckCircle2 className="h-12 w-12" />
-        </div>
+        <SuccessAnimation />
         <h1 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">Order Placed Successfully!</h1>
         <p className="text-gray-500 mb-4 text-lg">
           Thank you for your purchase. We will contact you soon to confirm the delivery.
@@ -262,7 +261,7 @@ export default function Checkout() {
                   value={formData.name}
                   onChange={e => setFormData({...formData, name: e.target.value})}
                   className="w-full text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-gray-50 dark:bg-gray-800 dark:text-white focus:bg-white dark:focus:bg-gray-900 focus:ring-1 focus:ring-black focus:outline-none"
-                  placeholder="e.g. Mahir xahin"
+                  placeholder="Your Name"
                 />
               </div>
               <div className="space-y-1">
@@ -348,7 +347,19 @@ export default function Checkout() {
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">৳{item.price}</span>
                         {item.selectedSize && (
-                          <span className="text-[9px] font-black bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-1 py-0.5 rounded uppercase">Size: {item.selectedSize}</span>
+                          <div className="relative inline-block">
+                            <select
+                              value={item.selectedSize || 'M'}
+                              onChange={(e) => updateCartItemSize(item.id, item.selectedSize || 'M', e.target.value)}
+                              className="text-[9px] font-black uppercase text-gray-550 dark:text-gray-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded px-1 py-0.5 leading-none focus:outline-none focus:border-black dark:focus:border-white cursor-pointer"
+                            >
+                              {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(sz => (
+                                <option key={sz} value={sz} className="bg-white dark:bg-gray-900 text-gray-950 dark:text-gray-100">
+                                  Size: {sz}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         )}
                         
                         <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900">
@@ -363,7 +374,22 @@ export default function Checkout() {
                           <span className="px-1.5 text-center font-bold text-[10px] min-w-[16px] text-gray-800 dark:text-gray-200">{item.quantity}</span>
                           <button
                             type="button"
-                            onClick={() => updateCartQuantity(item.id, item.quantity + 1, item.selectedSize)}
+                            onClick={() => {
+                              const stock = item.stock || 0;
+                              if (item.quantity >= stock) {
+                                Swal.fire({
+                                  title: 'স্টকে নাই',
+                                  text: `দুঃখিত, এই প্রোডাক্টটি সর্বোচ্চ ${stock} টি স্টকে আছে।`,
+                                  icon: 'warning',
+                                  timer: 2000,
+                                  showConfirmButton: false,
+                                  toast: true,
+                                  position: 'top-end'
+                                });
+                              } else {
+                                updateCartQuantity(item.id, item.quantity + 1, item.selectedSize);
+                              }
+                            }}
                             className="p-1 text-gray-400 hover:text-black dark:hover:text-white focus:outline-none"
                           >
                             <Plus className="h-2.5 w-2.5" />

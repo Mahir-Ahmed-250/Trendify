@@ -1,13 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useShop } from '../ShopContext';
 import { ArrowLeft, ShoppingCart, ShieldCheck, Truck, Plus, Minus, X, Ruler, Star, MessageSquare, CheckCircle, Calendar, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Helmet } from 'react-helmet-async';
+import Swal from 'sweetalert2';
 
 export default function ProductDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { products, addToCart, setIsCartOpen, reviews, addReview } = useShop();
+  const { products, addToCart, setIsCartOpen, reviews, addReview, cart, updateCartQuantity, getProductPriceForSize, getProductStockForSize } = useShop();
 
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState('M');
@@ -16,6 +18,7 @@ export default function ProductDetails() {
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
   const [isZooming, setIsZooming] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -58,6 +61,11 @@ export default function ProductDetails() {
 
   const product = products.find(p => p.id === id);
 
+  const currentPrice = useMemo(() => {
+    if (!product) return 0;
+    return getProductPriceForSize(product, selectedSize);
+  }, [product, selectedSize, getProductPriceForSize]);
+
   const productReviews = useMemo(() => {
     return reviews.filter(r => r.productId === id && r.status === 'approved');
   }, [reviews, id]);
@@ -99,6 +107,10 @@ export default function ProductDetails() {
   if (!product) {
     return (
       <div className="flex-1 w-full bg-gray-50 py-20 flex flex-col items-center justify-center text-center">
+        <Helmet>
+          <title>Product Not Found | Trendify</title>
+          <meta name="description" content="Look for the latest fashion trends at Trendify." />
+        </Helmet>
         <h2 className="text-2xl font-black text-gray-900 mb-4 uppercase">Product Not Found</h2>
         <button onClick={() => navigate('/shop')} className="bg-black text-white px-8 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-gray-800 transition-colors">
           Back to Shop
@@ -107,21 +119,73 @@ export default function ProductDetails() {
     );
   }
 
-  const isOutOfStock = (product.stock || 0) <= 0;
+  const isOutOfStock = getProductStockForSize(product, selectedSize) <= 0;
+
+  const isProductInCart = useMemo(() => {
+    return cart.some(item => item.id === product?.id && (item.selectedSize || 'M') === selectedSize);
+  }, [cart, product?.id, selectedSize]);
+
+  const cartItem = useMemo(() => {
+    return cart.find(item => item.id === product?.id && (item.selectedSize || 'M') === selectedSize);
+  }, [cart, product?.id, selectedSize]);
+
+  useEffect(() => {
+    if (cartItem) {
+      setQuantity(cartItem.quantity);
+    } else {
+      setQuantity(1);
+    }
+  }, [cartItem]);
+
+  const handleAddToCart = () => {
+    if (!product || isOutOfStock || isAdded || isProductInCart) return;
+    addToCart(product, quantity, selectedSize);
+    setIsAdded(true);
+    setTimeout(() => setIsAdded(false), 2000);
+  };
 
   const handleBuyNow = () => {
     if (isOutOfStock) return;
-    // Add chosen quantity and size to cart and navigate to checkout directly
-    addToCart(product, quantity, selectedSize);
+    if (isProductInCart) {
+      // If the product is already in the cart, do not add the quantity again to prevent duplicating/doubling.
+      // Simply ensure the quantity matches the current selection and navigate to checkout.
+      updateCartQuantity(product.id, quantity, selectedSize);
+    } else {
+      addToCart(product, quantity, selectedSize);
+    }
     navigate('/checkout');
   };
 
   const handleIncrease = () => {
-    if (quantity < (product.stock || 0)) {
-      setQuantity(prev => prev + 1);
+    const maxStock = getProductStockForSize(product, selectedSize);
+    if (quantity < maxStock) {
+      const newQty = quantity + 1;
+      setQuantity(newQty);
+      if (isProductInCart) {
+        updateCartQuantity(product.id, newQty, selectedSize);
+      }
+    } else {
+      Swal.fire({
+        title: 'স্টকে নাই',
+        text: `দুঃখিত, এই প্রোডাক্টটি সাইজ ${selectedSize} সর্বোচ্চ ${maxStock} টি স্টকে আছে।`,
+        icon: 'warning',
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
     }
   };
-  const handleDecrease = () => setQuantity(prev => (prev > 1 ? prev - 1 : 1));
+
+  const handleDecrease = () => {
+    if (quantity > 1) {
+      const newQty = quantity - 1;
+      setQuantity(newQty);
+      if (isProductInCart) {
+        updateCartQuantity(product.id, newQty, selectedSize);
+      }
+    }
+  };
 
   // Default fallback size guide image if none uploaded by admin
   const fallbackSizeChart = "https://images.unsplash.com/photo-1543087903-1ac2ec7aa8c5?auto=format&fit=crop&q=80&w=1000";
@@ -137,6 +201,10 @@ export default function ProductDetails() {
       transition={{ duration: 0.4 }}
       className="flex-1 w-full bg-white py-12 relative"
     >
+      <Helmet>
+        <title>{product.name} | Trendify</title>
+        <meta name="description" content={product.description} />
+      </Helmet>
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <button onClick={() => navigate(-1)} className="flex items-center text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-black transition-colors mb-8">
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
@@ -300,12 +368,12 @@ export default function ProductDetails() {
             )}
 
             <div className="flex items-center gap-3 mb-2">
-              <p className="text-2xl font-black text-gray-900">৳{product.price}</p>
-              {product.oldPrice && product.oldPrice > product.price && (
+              <p className="text-2xl font-black text-gray-900">৳{currentPrice}</p>
+              {product.oldPrice && product.oldPrice > currentPrice && (
                 <div className="flex items-center gap-2">
                   <p className="text-base text-gray-400 line-through">৳{product.oldPrice}</p>
                   <div className="bg-red-50 text-red-600 text-[10px] font-black px-2 py-0.5 rounded-full border border-red-100 uppercase tracking-tighter">
-                    SAVE ৳{product.oldPrice - product.price}
+                    SAVE ৳{product.oldPrice - currentPrice}
                   </div>
                 </div>
               )}
@@ -314,11 +382,11 @@ export default function ProductDetails() {
             <div className="mb-8">
               {isOutOfStock ? (
                 <span className="inline-block bg-red-50 text-red-600 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-red-100">
-                  Out of Stock (স্টকে নেই)
+                  Size {selectedSize}: Out of Stock (এই সাইজটি স্টকে নেই)
                 </span>
               ) : (
                 <span className="inline-block bg-green-50 text-green-600 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-green-100">
-                  {product.stock} products available in stock (স্টকে আছে)
+                  Size {selectedSize}: {getProductStockForSize(product, selectedSize)} products available in stock (স্টকে আছে)
                 </span>
               )}
             </div>
@@ -340,8 +408,8 @@ export default function ProductDetails() {
                   Size Guide (সাইজ গাইড)
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-2">
-                {['S', 'M', 'L', 'XL'].map(size => (
+              <div className="grid grid-cols-6 gap-2">
+                {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(size => (
                   <button 
                     key={size}
                     type="button"
@@ -381,19 +449,46 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Buy Now Button */}
-            <button 
-              type="button"
-              disabled={isOutOfStock}
-              onClick={handleBuyNow}
-              className={`w-full flex items-center justify-center gap-3 py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-xl transition-all mb-8 ${
-                isOutOfStock 
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' 
-                  : 'bg-black text-white shadow-black/10 active:scale-95 hover:bg-gray-900'
-              }`}
-            >
-              {isOutOfStock ? 'Out of Stock' : 'Buy Now'}
-            </button>
+            {/* Add to Cart and Buy Now Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <button 
+                type="button"
+                disabled={isOutOfStock || isAdded || isProductInCart}
+                onClick={handleAddToCart}
+                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-all border ${
+                  isOutOfStock 
+                    ? 'bg-gray-50 border-gray-100 text-gray-300 dark:bg-gray-800 dark:border-gray-700 cursor-not-allowed' 
+                    : (isAdded || isProductInCart)
+                      ? 'bg-green-600 border-green-600 text-white dark:bg-green-700 dark:border-green-700 font-bold cursor-default select-none'
+                      : 'bg-white text-black border-black hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 dark:hover:bg-gray-800 active:scale-95'
+                }`}
+              >
+                {(isAdded || isProductInCart) ? (
+                  <>
+                    <Check className="h-4.5 w-4.5" />
+                    Added to Cart
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="h-4.5 w-4.5" />
+                    Add to Cart
+                  </>
+                )}
+              </button>
+
+              <button 
+                type="button"
+                disabled={isOutOfStock}
+                onClick={handleBuyNow}
+                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-xl transition-all ${
+                  isOutOfStock 
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none' 
+                    : 'bg-black text-white shadow-black/10 active:scale-95 hover:bg-gray-900'
+                }`}
+              >
+                {isOutOfStock ? 'Out of Stock' : 'Buy Now'}
+              </button>
+            </div>
 
             {/* Trust Badges */}
             <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-8">
@@ -416,7 +511,13 @@ export default function ProductDetails() {
         </div>
 
         {/* Full Reviews Section */}
-        <div className="mt-24 border-t border-gray-100 pt-24 max-w-4xl mx-auto w-full">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="mt-24 border-t border-gray-100 pt-24 max-w-4xl mx-auto w-full"
+        >
           <div className="flex flex-col gap-16">
             {/* Header & Stats Summary */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-12">
@@ -526,7 +627,14 @@ export default function ProductDetails() {
                     <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Only verified buyers can leave a review</p>
                   </div>
                   
-                  <form onSubmit={handleReviewSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <motion.form 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: false }}
+                    transition={{ delay: 0.2 }}
+                    onSubmit={handleReviewSubmit} 
+                    className="grid grid-cols-1 md:grid-cols-2 gap-8"
+                  >
                     <div className="space-y-6">
                       <div className="space-y-1.5">
                         <label className="text-[10px] uppercase font-black tracking-widest text-gray-400 ml-1">Your Rating</label>
@@ -554,7 +662,7 @@ export default function ProductDetails() {
                           type="text" 
                           value={reviewName}
                           onChange={(e) => setReviewName(e.target.value)}
-                          placeholder="Ex: Md. Zakiul Islam"
+                          placeholder="Your Name"
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all focus:bg-white"
                         />
                       </div>
@@ -615,12 +723,12 @@ export default function ProductDetails() {
                         </button>
                       </div>
                     </div>
-                  </form>
+                  </motion.form>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Pop-up Size Guide Modal */}

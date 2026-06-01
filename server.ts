@@ -443,9 +443,12 @@ async function startServer() {
 
   app.post("/api/send-invoice", async (req, res) => {
     try {
-      const { email, order } = req.body;
+      let { email, order } = req.body;
+      if (!email && order?.customer?.email) {
+        email = order.customer.email;
+      }
       if (!email || !order) {
-        return res.status(400).json({ error: "Email and order are required." });
+        return res.status(400).json({ error: "Email and order are required. If customer email is missing, please update it." });
       }
 
       const itemsHtml = order.items.map((item: any) => `

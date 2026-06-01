@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useShop } from '../ShopContext';
 import ProductCard from '../components/ProductCard';
+import { ProductCardSkeleton } from '../components/Skeleton';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -11,6 +12,14 @@ export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const activeCategory = searchParams.get('category') || '';
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Show skeletons on initial load or category change
+    setLoading(true);
+    const timer = setTimeout(() => setLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, [activeCategory, query]);
 
   const [minPrice, setMinPrice] = useState<number | ''>('');
   const [maxPrice, setMaxPrice] = useState<number | ''>('');
@@ -112,12 +121,18 @@ export default function Shop() {
         )}
 
         {/* Filters Sidebar */}
-        <div className={`
-          fixed md:static inset-y-0 right-0 z-50 w-[85vw] max-w-sm md:w-64 shrink-0 
-          bg-white md:bg-transparent p-6 md:p-0 border-l border-gray-200 md:border-l-0
-          transform transition-transform duration-300 ease-in-out overflow-y-auto
-          ${showFilters ? 'translate-x-0' : 'translate-x-[100%] md:translate-x-0'}
-        `}>
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className={`
+            fixed md:static inset-y-0 right-0 z-50 w-[85vw] max-w-sm md:w-64 shrink-0 
+            bg-white md:bg-transparent p-6 md:p-0 border-l border-gray-200 md:border-l-0
+            transform transition-transform duration-300 ease-in-out overflow-y-auto
+            ${showFilters ? 'translate-x-0' : 'translate-x-[100%] md:translate-x-0'}
+          `}
+        >
           <div className="flex items-center justify-between md:hidden mb-6">
             <h2 className="text-xl font-black uppercase tracking-tight">Filters</h2>
             <button onClick={() => setShowFilters(false)} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5"/></button>
@@ -225,10 +240,16 @@ export default function Shop() {
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Main Content */}
-        <div className="flex-1 w-full">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="flex-1 w-full"
+        >
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-5">
             <div className="flex flex-col items-start gap-1">
               <h1 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Our Collection</h1>
@@ -284,12 +305,16 @@ export default function Shop() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-              {filteredProducts.map(product => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+              {loading ? (
+                Array(8).fill(0).map((_, i) => <ProductCardSkeleton key={i} />)
+              ) : (
+                filteredProducts.map(product => (
+                  <ProductCard key={product.id} product={product} />
+                ))
+              )}
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
     </motion.div>
   );

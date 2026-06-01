@@ -79,6 +79,8 @@ export interface Product {
   serial?: number;
   stock: number;
   oldPrice?: number;
+  sizePrices?: { [size: string]: number };
+  sizeStocks?: { [size: string]: number };
   deleted?: boolean;
 }
 

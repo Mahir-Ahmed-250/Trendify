@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, ArrowRight, X } from 'lucide-react';
 import { useShop } from '../ShopContext';
 import { motion, AnimatePresence } from 'motion/react';
+import Swal from 'sweetalert2';
 
 export default function CartSidebar() {
-  const { cart, removeFromCart, updateCartQuantity, isCartOpen, setIsCartOpen } = useShop();
+  const { cart, removeFromCart, updateCartQuantity, updateCartItemSize, isCartOpen, setIsCartOpen, clearCart } = useShop();
   const navigate = useNavigate();
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -33,7 +34,20 @@ export default function CartSidebar() {
             className="fixed inset-y-0 right-0 max-w-md w-full bg-white dark:bg-gray-950 z-[120] shadow-2xl flex flex-col"
           >
             <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-950">
-              <h2 className="text-xl font-black uppercase tracking-tight dark:text-white">Your Cart</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-black uppercase tracking-tight dark:text-white">Your Cart</h2>
+                {cart.length > 0 && (
+                  <button 
+                    onClick={() => {
+                      clearCart();
+                    }}
+                    className="text-[9px] font-black text-red-500 hover:text-red-750 dark:text-red-400 dark:hover:text-red-350 uppercase tracking-widest border border-red-100 dark:border-red-900/30 bg-red-50/50 dark:bg-red-950/20 px-2 py-0.5 rounded-md transition-all active:scale-95"
+                    title="Clear entire cart"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
               <button 
                 onClick={() => setIsCartOpen(false)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors dark:text-gray-400"
@@ -78,7 +92,19 @@ export default function CartSidebar() {
                         </div>
                         <div className="flex items-center gap-2 mb-1">
                           {item.selectedSize && (
-                            <span className="text-[9px] font-black uppercase text-gray-400 border border-gray-200 dark:border-gray-700 px-1 py-0.5 rounded leading-none">S: {item.selectedSize}</span>
+                            <div className="relative inline-block">
+                              <select
+                                value={item.selectedSize || 'M'}
+                                onChange={(e) => updateCartItemSize(item.id, item.selectedSize || 'M', e.target.value)}
+                                className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded px-1 py-0.5 leading-none focus:outline-none focus:border-black dark:focus:border-white cursor-pointer"
+                              >
+                                {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(sz => (
+                                  <option key={sz} value={sz} className="bg-white dark:bg-gray-900 text-gray-950 dark:text-gray-100">
+                                    Size: {sz}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           )}
                           <span className="text-[10px] font-bold text-gray-900 dark:text-gray-200">৳{item.price}</span>
                         </div>
@@ -93,7 +119,22 @@ export default function CartSidebar() {
                             </button>
                             <span className="w-6 text-center font-bold text-[10px] dark:text-white">{item.quantity}</span>
                             <button
-                              onClick={() => updateCartQuantity(item.id, item.quantity + 1, item.selectedSize)}
+                              onClick={() => {
+                                const stock = item.stock || 0;
+                                if (item.quantity >= stock) {
+                                  Swal.fire({
+                                    title: 'স্টকে নাই',
+                                    text: `দুঃখিত, এই প্রোডাক্টটি সর্বোচ্চ ${stock} টি স্টকে আছে।`,
+                                    icon: 'warning',
+                                    timer: 2000,
+                                    showConfirmButton: false,
+                                    toast: true,
+                                    position: 'top-end'
+                                  });
+                                } else {
+                                  updateCartQuantity(item.id, item.quantity + 1, item.selectedSize);
+                                }
+                              }}
                               className="p-1 px-1.5 text-gray-500 hover:text-black dark:hover:text-white focus:outline-none"
                             >
                               <Plus className="h-2.5 w-2.5" />

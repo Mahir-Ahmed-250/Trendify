@@ -270,7 +270,13 @@ export default function TrackOrder() {
               animate={{ opacity: 1 }}
               className="space-y-8"
             >
-              <div className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm gap-4">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
+                transition={{ duration: 0.5 }}
+                className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm gap-4"
+              >
                 <div className="text-center md:text-left">
                   <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Search Results</h3>
                   <p className="text-lg font-black dark:text-white">
@@ -284,7 +290,7 @@ export default function TrackOrder() {
                 >
                   New Search
                 </button>
-              </div>
+              </motion.div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {results.map((order) => (
