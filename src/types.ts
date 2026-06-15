@@ -84,6 +84,13 @@ export interface Product {
   deleted?: boolean;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  deleted?: boolean;
+}
+
 export interface FAQItem {
   id: string;
   question: string;
@@ -130,6 +137,7 @@ export interface Order {
   items: CartItem[];
   subtotal: number;
   discount: number;
+  shippingCharge?: number;
   total: number;
   couponCode?: string;
   date: string;
@@ -156,7 +164,8 @@ export interface AdminPermissions {
   orders: boolean;
   coupons: boolean;
   slides: boolean;
-  categories: boolean;
+  categoryBanners: boolean; // Renamed from categories
+  categories: boolean; // New: management of category list
   lookbook: boolean;
   subscribers: boolean;
   messages: boolean;
@@ -165,20 +174,8 @@ export interface AdminPermissions {
   policies: boolean;
   otps?: boolean;
   otpsDelete?: boolean;
-  activityLogs?: boolean;
   reviews?: boolean;
   notifications?: boolean;
-}
-
-export interface ActivityLog {
-  id: string;
-  adminId: string;
-  adminName: string;
-  adminEmail: string;
-  actionType: 'create' | 'update' | 'delete' | 'auth' | 'other';
-  targetModule: string;
-  details: string;
-  timestamp: string;
 }
 
 export interface OTPRecord {

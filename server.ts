@@ -5,8 +5,14 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import fs from "fs/promises";
 import { MongoClient, Db } from "mongodb";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
 dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || "neonthread_secure_fallback_secret_key";
 
 const DB_FILE = path.join(process.cwd(), "db.json");
 
@@ -24,7 +30,8 @@ const COLLECTION_KEYS = [
   "popupAds",
   "homeAds",
   "admins",
-  "otps"
+  "otps",
+  "categories"
 ];
 
 let mongoClient: MongoClient | null = null;
@@ -82,8 +89,8 @@ async function getMongoDb(): Promise<Db | null> {
         serverSelectionTimeoutMS: 15000 // 5 seconds timeout before fallback so app doesn't hang
       });
       await mongoClient.connect();
-      mongoDb = mongoClient.db("trendify_db");
-      console.log("Connected successfully to MongoDB database: trendify_db!");
+      mongoDb = mongoClient.db("neonthread_db");
+      console.log("Connected successfully to MongoDB database: neonthread_db!");
       lastMongoError = null;
     } catch (err: any) {
       lastMongoError = err.message || String(err);
@@ -117,6 +124,20 @@ async function readDb() {
 
       // Check if we retrieved actual data
       const hasData = COLLECTION_KEYS.some((key) => dbObj[key] && dbObj[key].length > 0);
+      
+      // Cleanup specifically requested by user: remove admin@tbari.com
+      if (hasData && dbObj.admins) {
+        const initialCount = dbObj.admins.length;
+        dbObj.admins = dbObj.admins.filter((a: any) => a.email !== 'admin@tbari.com');
+        if (dbObj.admins.length < initialCount) {
+          console.log("Cleanup: Removed forbidden admin email. Syncing to MongoDB...");
+          const mongo = await getMongoDb();
+          if (mongo) {
+             await mongo.collection('admins').deleteMany({ email: 'admin@tbari.com' });
+          }
+        }
+      }
+
       if (hasData) {
         return dbObj;
       } else {
@@ -184,17 +205,13 @@ async function writeDbKey(key: string, data: any): Promise<boolean> {
         const col = mongo.collection(key);
         const array = Array.isArray(data) ? data : [];
         
-        // If it's a collection we manage as an array, we should sync it.
-        // To respect "never delete" but also allow user requested deletions:
-        // We will now actually mirror the array to the collection.
-        // If the user wants to hard-delete from the DB, they remove it from the array.
-        
         // 1. Get all existing IDs in the collection
         const existingDocs = await col.find({}, { projection: { _id: 1 } }).toArray();
         const existingIds = existingDocs.map(d => d._id.toString());
         
-        // 2. Prepare new IDs
-        const newDocIds = new Set();
+        // 2. Prepare bulk operations
+        const newDocIds = new Set<string>();
+        const bulkOps: any[] = [];
         
         if (array.length > 0) {
           for (const item of array) {
@@ -206,25 +223,37 @@ async function writeDbKey(key: string, data: any): Promise<boolean> {
             doc._id = targetId;
             newDocIds.add(targetId.toString());
 
-            const filter = { _id: targetId };
             const setPayload = { ...doc };
             delete setPayload._id;
             
-            await col.updateOne(filter, { $set: setPayload }, { upsert: true });
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: targetId },
+                update: { $set: setPayload },
+                upsert: true
+              }
+            });
           }
         }
 
-        // 3. Remove documents that are no longer in the array
-        // We only do this if it's not a "critical" collection or if we are explicitly syncing.
-        // Given the user frustration, we MUST sync.
+        // 3. Identify and add delete operations for missing documents
         const idsToDelete = existingIds.filter(id => !newDocIds.has(id));
         if (idsToDelete.length > 0) {
-          await col.deleteMany({ _id: { $in: idsToDelete as any } });
+          bulkOps.push({
+            deleteMany: {
+              filter: { _id: { $in: idsToDelete as any } }
+            }
+          });
+        }
+
+        // 4. Execute all operations in a single bulk request
+        if (bulkOps.length > 0) {
+          await col.bulkWrite(bulkOps, { ordered: false });
         }
         
         return true;
       } catch (err: any) {
-        console.error(`Error writing key '${key}' to MongoDB collection, falling back to local file:`, err.message || err);
+        console.error(`Error writing key '${key}' to MongoDB collection via bulkWrite:`, err.message || err);
       }
     }
 
@@ -266,6 +295,56 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // IMPORTANT: Trust the first proxy (required for accurate rate limiting in our cloud environment)
+  app.set("trust proxy", 1);
+
+  // Security Hardening: Apply Helmet for secure headers and Rate Limiting
+  app.use(helmet({
+    contentSecurityPolicy: false, // Maintain compatibility with external assets
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // Rate limit for all API requests
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests, please try again later." }
+  });
+  app.use("/api/", apiLimiter);
+
+  // Stricter limiter for email/OTP routes to prevent abuse
+  const sensitiveRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 20,
+    message: { error: "Sensitive action limit reached. Please try again in an hour." }
+  });
+  app.use("/api/send-newsletter", sensitiveRateLimiter);
+  app.use("/api/send-otp-email", sensitiveRateLimiter);
+  app.use("/api/send-invoice", sensitiveRateLimiter);
+
+  const authenticateAdminRequest = async (req: express.Request) => {
+    // 1. Check if token matches static secret (header)
+    const adminSecret = process.env.ADMIN_API_SECRET;
+    const secretToken = req.headers['x-admin-secret'] || req.headers['authorization'];
+    if (adminSecret && secretToken === adminSecret) {
+        return true;
+    }
+    
+    // 2. Check if token is a valid JWT admin token (body)
+    const { token } = req.body;
+    if (token) {
+       try {
+         jwt.verify(token, JWT_SECRET);
+         return true;
+       } catch (e) {
+         // Invalid JWT
+       }
+    }
+    return false;
+  };
+
   let vite: any;
   if (process.env.NODE_ENV !== "production") {
     vite = await createViteServer({
@@ -306,8 +385,8 @@ async function startServer() {
 
       let html = await fs.readFile(htmlFile, "utf-8");
 
-      const title = `${product.name} | Trendify`;
-      const description = product.description || `Premium quality ${product.name} available at Trendify. Shop now for the best deals.`;
+      const title = `${product.name} | NeonThread`;
+      const description = product.description || `Premium quality ${product.name} available at NeonThread. Shop now for the best deals.`;
       const image = (product.images && product.images.length > 0) ? product.images[0] : "";
 
       const ogTags = `
@@ -345,7 +424,176 @@ async function startServer() {
   app.get("/api/db", async (req, res) => {
     try {
       const db = await readDb();
+      // SECURITY: Sanitize admins to remove passwords from general fetch
+      if (db && db.admins) {
+        db.admins = db.admins.map((admin: any) => {
+          const { password, ...rest } = admin;
+          return rest;
+        });
+      }
       res.json(db || {});
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+      const normalizedEmail = email.trim().toLowerCase();
+      const db = await readDb(); // Use readDb() to check live MongoDB data
+      const admins = db?.admins || [];
+      const admin = admins.find((a: any) => a.email && a.email.trim().toLowerCase() === normalizedEmail && a.isActive !== false);
+
+      if (!admin) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Check if password matches (handling both plain text for legacy and hashed for new)
+      let isMatch = false;
+      if (admin.password.startsWith("$2a$") || admin.password.startsWith("$2b$")) {
+        isMatch = await bcrypt.compare(password, admin.password);
+      } else {
+        isMatch = admin.password === password;
+      }
+
+      if (!isMatch) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const token = jwt.sign(
+        { id: admin.id, email: admin.email, role: admin.role },
+        JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      const { password: _, ...adminWithoutPassword } = admin;
+      res.json({ success: true, token, admin: adminWithoutPassword });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/admin/update-profile", async (req, res) => {
+    try {
+      const { id, updates, token } = req.body;
+      if (!token) return res.status(401).json({ error: "Authentication token required" });
+      
+      const decoded: any = jwt.verify(token, JWT_SECRET);
+      if (decoded.id !== id && decoded.role !== 'super') {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+
+      const db = await readDb();
+      const adminIndex = db.admins?.findIndex((a: any) => a.id === id);
+      
+      if (adminIndex === -1) return res.status(404).json({ error: "Admin not found" });
+
+      if (updates.password) {
+        updates.password = await bcrypt.hash(updates.password, 10);
+      }
+
+      const updatedAdmin = { ...db.admins[adminIndex], ...updates };
+      db.admins[adminIndex] = updatedAdmin;
+      
+      await writeDbKey("admins", db.admins);
+      
+      const { password: _, ...safeAdmin } = updatedAdmin;
+      res.json({ success: true, admin: safeAdmin });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+      const normalizedEmail = email.trim().toLowerCase();
+      const db = await readDb();
+      const admin = db?.admins?.find((a: any) => a.email && a.email.trim().toLowerCase() === normalizedEmail);
+      
+      if (!admin) {
+        return res.status(404).json({ error: "Admin with this email not found." });
+      }
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      const otps = db.otps || [];
+      const newOtp = {
+        id: `forgot_${Date.now()}`,
+        email: normalizedEmail,
+        otp,
+        createdAt: new Date().toISOString(),
+        verified: false,
+        purpose: 'reset_password'
+      };
+      
+      // Keep only last 100 OTPs to prevent db bloat
+      const updatedOtps = [newOtp, ...(otps.slice(0, 99))];
+      await writeDbKey('otps', updatedOtps);
+
+      const mailer = getTransporter();
+      await mailer.sendMail({
+        from: `"NEONTHREAD" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `[${otp}] Reset your Password - NEONTHREAD Admin`,
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; max-width: 600px; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #000;">Reset Admin Password</h2>
+            <p>You requested a password reset for your NeonThread admin account.</p>
+            <p>Use the following 6-digit verification code:</p>
+            <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #000;">${otp}</div>
+            <p style="color: #666; font-size: 12px; margin-top: 20px;">This code will expire in 10 minutes. If you didn't request this, please ignore this email.</p>
+          </div>
+        `
+      });
+
+      res.json({ success: true, message: "Verification code sent to your email." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, otp: rawOtp, newPassword } = req.body;
+      if (!email || !rawOtp) return res.status(400).json({ error: "Email and verification code are required" });
+      
+      const normalizedEmail = email.trim().toLowerCase();
+      const otp = String(rawOtp).trim();
+      
+      const db = await readDb();
+      
+      const otpRecord = (db.otps || []).find((o: any) => 
+        o.email && o.email.trim().toLowerCase() === normalizedEmail && 
+        String(o.otp).trim() === otp && 
+        !o.verified && 
+        o.purpose === 'reset_password'
+      );
+      
+      if (!otpRecord) {
+        return res.status(400).json({ error: "Invalid or expired verification code." });
+      }
+
+      const createdAt = new Date(otpRecord.createdAt).getTime();
+      if (Date.now() - createdAt > 10 * 60 * 1000) {
+        return res.status(400).json({ error: "Verification code expired." });
+      }
+
+      const adminIndex = db.admins?.findIndex((a: any) => a.email && a.email.trim().toLowerCase() === normalizedEmail);
+      if (adminIndex === -1) return res.status(404).json({ error: "Admin not found." });
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      db.admins[adminIndex].password = hashedPassword;
+      
+      const updatedOtps = db.otps.map((o: any) => o.id === otpRecord.id ? { ...o, verified: true } : o);
+      
+      await writeDbKey('admins', db.admins);
+      await writeDbKey('otps', updatedOtps);
+
+      res.json({ success: true, message: "Password reset successful. You can now login." });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -357,7 +605,7 @@ async function startServer() {
       res.json({
         connected: mongo !== null,
         uri_configured: !!process.env.MONGODB_URI,
-        database: "trendify_db",
+        database: "neonthread_db",
         collection: "Multiple Dedicated Collections (13)",
         error: lastMongoError,
       });
@@ -368,6 +616,9 @@ async function startServer() {
 
   app.post("/api/db/init", async (req, res) => {
     try {
+      if (!(await authenticateAdminRequest(req))) {
+        return res.status(401).json({ error: "Unauthorized: Admin API Secret or Token required." });
+      }
       const db = req.body;
       await writeDb(db);
       res.json({ success: true });
@@ -378,11 +629,40 @@ async function startServer() {
 
   app.post("/api/db/save", async (req, res) => {
     try {
+      if (!(await authenticateAdminRequest(req))) {
+        return res.status(401).json({ error: "Unauthorized: Admin API Secret or Token required." });
+      }
       const { key, data } = req.body;
       if (!key) {
         return res.status(400).json({ error: "Key is required" });
       }
-      await writeDbKey(key, data);
+
+      // SECURITY: If we are saving the admins collection, ensure passwords are preserved and hashed if plaintext
+      if (key === 'admins' && Array.isArray(data)) {
+        const db = await readDb(); // Get existing admins to preserve passwords if missing in payload
+        const existingAdmins = db?.admins || [];
+        
+        const processedAdmins = await Promise.all(data.map(async (admin: any) => {
+          const existing = existingAdmins.find((a: any) => a.id === admin.id);
+          const finalAdmin = { ...admin };
+          
+          // Preserve existing password if not provided in the update
+          if (!finalAdmin.password && existing?.password) {
+            finalAdmin.password = existing.password;
+          }
+          
+          // Hash password if it's plaintext
+          if (finalAdmin.password && !finalAdmin.password.startsWith("$2a$") && !finalAdmin.password.startsWith("$2b$")) {
+             finalAdmin.password = await bcrypt.hash(finalAdmin.password, 10);
+          }
+          
+          return finalAdmin;
+        }));
+        await writeDbKey(key, processedAdmins);
+      } else {
+        await writeDbKey(key, data);
+      }
+      
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -422,19 +702,37 @@ async function startServer() {
         </div>
       `;
 
-      // Send emails using Nodemailer
-      const mailOptions = {
-        from: `"Shop Admin" <${process.env.EMAIL_USER || "admin@example.com"}>`,
-        to: isBulk ? [] : emails,
-        bcc: isBulk ? emails : [], // Use BCC for bulk to hide other recipients
-        subject: subject,
-        html: htmlBody,
-      };
-
+      // Send individual emails to ensure each is treated as a "new direct mail"
+      // preventing them from being grouped or flagged as hidden list/bulk mail.
       const mailer = getTransporter();
-      const info = await mailer.sendMail(mailOptions);
+      const messageIds: string[] = [];
+
+      if (isBulk) {
+        // Send individually in a loop (sequential is safer for standard Gmail service limits)
+        for (const email of emails) {
+          const info = await mailer.sendMail({
+            from: `"NEONTHREAD" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: subject,
+            html: htmlBody,
+            // Header to help prevent threading in some clients if the subject stays constant
+            headers: {
+              'X-Entity-Ref-ID': Date.now().toString() + Math.random().toString(36).substring(7)
+            }
+          });
+          messageIds.push(info.messageId);
+        }
+      } else {
+        const info = await mailer.sendMail({
+          from: `"NEONTHREAD" <${process.env.EMAIL_USER}>`,
+          to: emails[0],
+          subject: subject,
+          html: htmlBody,
+        });
+        messageIds.push(info.messageId);
+      }
       
-      res.status(200).json({ success: true, messageId: info.messageId });
+      res.status(200).json({ success: true, count: messageIds.length, messageId: messageIds[0] });
     } catch (err: any) {
       console.error("Nodemailer API Error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });
@@ -471,7 +769,7 @@ async function startServer() {
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #fff;">
           <div style="border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; display: table; width: 100%;">
             <div style="display: table-cell; vertical-align: middle;">
-              <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; color: #000;">TRENDIFY</h1>
+              <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; color: #000;">NEONTHREAD</h1>
             </div>
             <div style="display: table-cell; text-align: right; vertical-align: middle;">
               <span style="font-size: 14px; color: #888; font-weight: bold;">INVOICE</span>
@@ -526,7 +824,7 @@ async function startServer() {
           </div>
 
           <hr style="border: none; border-top: 1px solid #eaeaea; margin: 30px 0;" />
-          <p style="font-size: 11px; color: #aaa; text-align: center; margin: 0;">Thank you for shopping with TRENDIFY! This is a system-generated invoice.</p>
+          <p style="font-size: 11px; color: #aaa; text-align: center; margin: 0;">Thank you for shopping with NEONTHREAD! This is a system-generated invoice.</p>
         </div>
       `;
 
@@ -541,15 +839,19 @@ async function startServer() {
 
       // Send the email using Nodemailer
       const mailOptions = {
-        from: `"TRENDIFY" <${process.env.EMAIL_USER}>`,
+        from: `"NEONTHREAD" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: `Your Invoice for Order #${order.id} - TRENDIFY`,
+        subject: `Your Invoice for Order #${order.id} - NEONTHREAD`,
         html: invoiceHtml,
       };
 
       const mailer = getTransporter();
-      const info = await mailer.sendMail(mailOptions);
-      res.status(200).json({ success: true, messageId: info.messageId });
+      // Send email in background to prevent slow SMTP from delaying the response
+      mailer.sendMail(mailOptions).catch((err: any) => {
+        console.error("Nodemailer background invoice sending error:", err);
+      });
+      
+      res.status(200).json({ success: true, message: "Invoice email queued for sending in the background" });
     } catch (err: any) {
       console.error("Nodemailer invoice error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });
@@ -567,7 +869,7 @@ async function startServer() {
         <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 25px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
           <div style="border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; display: table; width: 100%;">
             <div style="display: table-cell; vertical-align: middle;">
-              <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; color: #000;">TRENDIFY</h1>
+              <h1 style="margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; color: #000;">NEONTHREAD</h1>
             </div>
             <div style="display: table-cell; text-align: right; vertical-align: middle;">
               <span style="font-size: 13px; color: #666; font-weight: bold;">ORDER TRACKING VERIFICATION</span>
@@ -575,7 +877,7 @@ async function startServer() {
           </div>
 
           <div style="margin-bottom: 25px;">
-            <p style="font-size: 15px; color: #333; line-height: 1.5; margin: 0 0 15px 0;">আপনার Trendify অর্ডারের বর্তমান অবস্থা ট্র্যাক করতে নিচে দেওয়া সিকিউরিটি কোড (OTP) ব্যবহার করুন:</p>
+            <p style="font-size: 15px; color: #333; line-height: 1.5; margin: 0 0 15px 0;">আপনার NeonThread অর্ডারের বর্তমান অবস্থা ট্র্যাক করতে নিচে দেওয়া সিকিউরিটি কোড (OTP) ব্যবহার করুন:</p>
             <div style="background-color: #f0f7ff; border: 1px solid #e0f2fe; padding: 20px 10px; border-radius: 12px; text-align: center; margin: 25px 0;">
               <span style="font-family: monospace; font-size: 32px; font-weight: 900; color: #2563eb; letter-spacing: 5px;">${otp}</span>
             </div>
@@ -583,7 +885,7 @@ async function startServer() {
           </div>
 
           <hr style="border: none; border-top: 1px solid #eaeaea; margin: 25px 0;" />
-          <p style="font-size: 11px; color: #aaac; text-align: center; margin: 0;">TRENDIFY | Bangladesh's Premium T-Shirt Store</p>
+          <p style="font-size: 11px; color: #aaac; text-align: center; margin: 0;">NEONTHREAD | Bangladesh's Premium T-Shirt Store</p>
         </div>
       `;
 
@@ -597,15 +899,19 @@ async function startServer() {
       }
 
       const mailOptions = {
-        from: `"TRENDIFY" <${process.env.EMAIL_USER}>`,
+        from: `"NEONTHREAD" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: `[${otp}] Trendify Order Tracking OTP Code`,
+        subject: `[${otp}] NeonThread Order Tracking OTP Code`,
         html: otpHtml,
       };
 
       const mailer = getTransporter();
-      const info = await mailer.sendMail(mailOptions);
-      res.status(200).json({ success: true, messageId: info.messageId });
+      // Send email in background to prevent slow SMTP from delaying the response
+      mailer.sendMail(mailOptions).catch((err: any) => {
+        console.error("Nodemailer background OTP sending error:", err);
+      });
+      
+      res.status(200).json({ success: true, message: "OTP email queued for sending in the background" });
     } catch (err: any) {
       console.error("Nodemailer OTP sending error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });

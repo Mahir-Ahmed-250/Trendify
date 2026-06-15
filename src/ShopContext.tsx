@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, Order, Coupon, CartItem, CustomerInfo, Slide, CategoryBanner, LookbookImage, Subscriber, ContactMessage, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, OTPRecord, ActivityLog, Review } from './types';
+import { motion } from 'motion/react';
+import { Product, Order, Category, Coupon, CartItem, CustomerInfo, Slide, CategoryBanner, LookbookImage, Subscriber, ContactMessage, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, OTPRecord, Review } from './types';
 import { initialProducts, initialCoupons, initialSlides, initialCategoryBanners, initialLookbook } from './mockData';
 import { generateId } from './lib/utils';
 
@@ -17,11 +18,11 @@ interface ShopContextType {
   homeAds: HomeAd[];
   faqs: FAQItem[];
   policies: PolicyItem[];
+  categories: Category[];
   isAdminAuth: boolean;
+  authToken: string | null;
   currentAdmin: AdminUser | null;
   admins: AdminUser[];
-  activityLogs: ActivityLog[];
-  logActivity: (actionType: ActivityLog['actionType'], targetModule: string, details: string, adminOverride?: AdminUser) => void;
   getProductPriceForSize: (product: Product, size: string) => number;
   getProductStockForSize: (product: Product, size: string) => number;
   addToCart: (product: Product, quantity?: number, selectedSize?: string) => void;
@@ -31,8 +32,9 @@ interface ShopContextType {
   clearCart: () => void;
   placeOrder: (customer: CustomerInfo, couponCode?: string) => { success: boolean; orderId?: string; error?: string };
   // Admin actions
-  loginAdmin: (email: string, pass: string) => boolean;
+  loginAdmin: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   logoutAdmin: () => void;
+  updateProfile: (updates: Partial<AdminUser>) => Promise<{ success: boolean; error?: string }>;
   addAdmin: (admin: AdminUser) => void;
   updateAdmin: (admin: AdminUser) => void;
   deleteAdmin: (id: string) => void;
@@ -42,6 +44,9 @@ interface ShopContextType {
   addCategoryBanner: (banner: Omit<CategoryBanner, 'id'>) => void;
   updateCategoryBanner: (banner: CategoryBanner) => void;
   deleteCategoryBanner: (id: string) => void;
+  addCategory: (category: Omit<Category, 'id'>) => void;
+  updateCategory: (category: Category) => void;
+  deleteCategory: (id: string) => void;
   addLookbookImage: (img: Omit<LookbookImage, 'id'>) => void;
   updateLookbookImage: (img: LookbookImage) => void;
   deleteLookbookImage: (id: string) => void;
@@ -81,6 +86,9 @@ interface ShopContextType {
   toggleDarkMode: () => void;
   wishlist: string[]; // Store product IDs
   toggleWishlist: (productId: string) => void;
+  comparisonItems: string[];
+  toggleComparison: (productId: string) => void;
+  clearComparison: () => void;
   reviews: Review[];
   addReview: (review: Omit<Review, 'id' | 'status' | 'date'>) => { success: boolean; message: string };
   updateReviewStatus: (reviewId: string, status: Review['status']) => void;
@@ -122,7 +130,7 @@ const defaultPolicies: PolicyItem[] = [
     id: 'policy_privacy',
     key: 'privacy_policy',
     title: 'Privacy Policy (প্রাইভেসি পলিসি)',
-    content: `ট্রেন্ডিফাই (TRENDIFY) অ্যাপলেট ব্যবহারে আপনার সকল তথ্যের গোপনীয়তা রক্ষা করতে আমরা প্রতিশ্রুতিবদ্ধ।
+    content: `নিওনথ্রেড (NEONTHREAD) অ্যাপলেট ব্যবহারে আপনার সকল তথ্যের গোপনীয়তা রক্ষা করতে আমরা প্রতিশ্রুতিবদ্ধ।
 
 ১. গ্রাহকের নাম, ফোন নম্বর, ইমেইল ও জেলা ভিত্তিক ঠিকানা কেবলমাত্র অর্ডার পৌঁছে দেওয়ার উদ্দেশ্যে সংগ্রহ ও সংরক্ষণ করা হয়।
 ২. আপনার পেমেন্ট বা ব্যক্তিগত তথ্য সম্পূর্ণ সুরক্ষিত থাকে এবং কোনো তৃতীয় পক্ষের কাছে এটি হস্তান্তর বা বিক্রি করা হয় না।
@@ -149,14 +157,55 @@ const defaultHomeAds: HomeAd[] = [
   }
 ];
 
+const DatabaseLoader = () => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const duration = 2000;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const p = Math.min(100, Math.floor((elapsed / duration) * 100));
+      setProgress(p);
+
+      if (elapsed >= duration) {
+        clearInterval(interval);
+      }
+    }, 30);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-950 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm flex flex-col items-center gap-4">
+        <p className="text-[10px] uppercase font-black tracking-widest text-gray-500">{progress}% </p>
+        <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden relative">
+          <motion.div
+            initial={{ width: "0%" }}
+            animate={{ width: `${progress}%` }}
+            transition={{ ease: "linear", duration: 0.1 }}
+            className="h-full bg-black dark:bg-white"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('ts_products');
     const data = saved ? JSON.parse(saved) : initialProducts;
     return data.map((p: Product) => ({
       ...p,
-      stock: p.stock !== undefined ? p.stock : 50
+      stock: p.stock !== undefined ? p.stock : 0
     }));
+  });
+
+  const [categories, setCategories] = useState<Category[]>(() => {
+    const saved = localStorage.getItem('ts_categories');
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [faqs, setFaqs] = useState<FAQItem[]>(() => {
@@ -224,13 +273,13 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
-    const saved = localStorage.getItem('ts_activity_logs');
-    return saved ? JSON.parse(saved) : [];
-  });
-
   const [wishlist, setWishlist] = useState<string[]>(() => {
     const saved = localStorage.getItem('ts_wishlist');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [comparisonItems, setComparisonItems] = useState<string[]>(() => {
+    const saved = localStorage.getItem('ts_comparison');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -251,6 +300,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       coupons: true,
       slides: true,
       categories: true,
+      categoryBanners: true,
       lookbook: true,
       subscribers: true,
       messages: true,
@@ -259,7 +309,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       policies: true,
       otps: true,
       otpsDelete: true,
-      activityLogs: true,
       reviews: true
     }
   };
@@ -275,8 +324,11 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [isAdminAuth, setIsAdminAuth] = useState<boolean>(() => {
-    const savedAdmin = localStorage.getItem('ts_current_admin');
-    return !!savedAdmin && savedAdmin !== '' && savedAdmin !== 'undefined';
+    return !!localStorage.getItem('ts_admin_token');
+  });
+
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    return localStorage.getItem('ts_admin_token');
   });
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -288,13 +340,30 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const serverSave = async (key: string, data: any) => {
     try {
-      await fetch('/api/db/save', {
+      const res = await fetch('/api/db/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, data })
+        body: JSON.stringify({ key, data, token: authToken || '' })
       });
-    } catch (err) {
-      console.error(`Failed to save ${key} to server database:`, err);
+      
+      if (!res.ok) {
+        let errorMsg = `Server error (${res.status})`;
+        try {
+          const errorData = await res.json();
+          errorMsg += `: ${errorData.error || res.statusText}`;
+        } catch (e) {
+          errorMsg += `: ${res.statusText}`;
+        }
+        throw new Error(errorMsg);
+      }
+      
+    } catch (err: any) {
+      if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+        // Quietly fail on network errors as the server might be restarting or slow
+        console.warn(`Server sync skipped for ${key} (network issue).`);
+      } else {
+        console.error(`Failed to save ${key} to server database:`, err);
+      }
     }
   };
 
@@ -308,11 +377,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (dbData.products) {
             setProducts(dbData.products.map((p: any) => ({
               ...p,
-              stock: p.stock !== undefined ? p.stock : 50
+              stock: p.stock !== undefined ? p.stock : 0
             })));
           }
           if (dbData.faqs) setFaqs(dbData.faqs);
           if (dbData.policies) setPolicies(dbData.policies);
+          if (dbData.categories) setCategories(dbData.categories);
           if (dbData.orders) setOrders(dbData.orders);
           if (dbData.coupons) setCoupons(dbData.coupons);
           if (dbData.slides) setSlides(dbData.slides);
@@ -324,13 +394,14 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (dbData.homeAds) setHomeAds(dbData.homeAds);
           if (dbData.admins) setAdmins(dbData.admins);
           if (dbData.otps) setOtps(dbData.otps);
-          if (dbData.activityLogs) setActivityLogs(dbData.activityLogs);
+          if (dbData.comparison) setComparisonItems(dbData.comparison);
         } else {
           // Initialize server with local storage values or default mocks
           const initialDb = {
             products,
             faqs,
             policies,
+            categories,
             orders,
             coupons,
             slides,
@@ -342,7 +413,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
             homeAds,
             admins,
             otps,
-            activityLogs
+            comparison: comparisonItems
           };
           await fetch('/api/db/init', {
             method: 'POST',
@@ -386,24 +457,46 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useServerSync('homeAds', homeAds, 'ts_home_ads');
   useServerSync('faqs', faqs, 'ts_faqs');
   useServerSync('policies', policies, 'ts_policies');
+  useServerSync('categories', categories, 'ts_categories');
   useServerSync('admins', admins, 'ts_admins');
   useServerSync('otps', otps, 'ts_otps');
-  useServerSync('activityLogs', activityLogs, 'ts_activity_logs');
   useServerSync('wishlist', wishlist, 'ts_wishlist');
+  useServerSync('comparison', comparisonItems, 'ts_comparison');
   useServerSync('reviews', reviews, 'ts_reviews');
 
   useEffect(() => { 
     localStorage.setItem('ts_cart', JSON.stringify(cart)); 
   }, [cart]);
 
+  // Keep currentAdmin in sync with the central admins list
+  useEffect(() => {
+    if (currentAdmin && admins.length > 0) {
+      const latest = admins.find(a => a.id === currentAdmin.id);
+      if (latest && (
+        latest.image !== currentAdmin.image || 
+        latest.name !== currentAdmin.name || 
+        latest.email !== currentAdmin.email ||
+        latest.role !== currentAdmin.role
+      )) {
+        setCurrentAdmin(latest);
+      }
+    }
+  }, [admins, currentAdmin]);
+
+  useEffect(() => {
+    if (authToken) {
+      localStorage.setItem('ts_admin_token', authToken);
+    } else {
+      localStorage.removeItem('ts_admin_token');
+    }
+  }, [authToken]);
+
   useEffect(() => {
     if (currentAdmin) {
       localStorage.setItem('ts_current_admin', JSON.stringify(currentAdmin));
-      localStorage.setItem('ts_admin_auth', 'true');
       setIsAdminAuth(true);
     } else {
       localStorage.removeItem('ts_current_admin');
-      localStorage.setItem('ts_admin_auth', 'false');
       setIsAdminAuth(false);
     }
   }, [currentAdmin]);
@@ -426,6 +519,22 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         : [...prev, productId]
     );
   };
+
+  const toggleComparison = (productId: string) => {
+    setComparisonItems(prev => {
+      const isAlreadyIn = prev.includes(productId);
+      if (isAlreadyIn) {
+        return prev.filter(id => id !== productId);
+      }
+      if (prev.length >= 4) {
+        // Limit to 4 products for comparison
+        return prev;
+      }
+      return [...prev, productId];
+    });
+  };
+
+  const clearComparison = () => setComparisonItems([]);
 
   const addReview = (reviewData: Omit<Review, 'id' | 'status' | 'date'>) => {
     // Validate orderId (case-insensitive and trimmed)
@@ -460,70 +569,69 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateReviewStatus = (reviewId: string, status: Review['status']) => {
     setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status } : r));
-    logActivity('update', 'reviews', `Changed review #${reviewId} status to ${status}`);
   };
 
   const deleteReview = (reviewId: string) => {
     setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, deleted: true } : r));
-    logActivity('delete', 'reviews', `Deleted review #${reviewId}`);
   };
 
-  const logActivity = (actionType: ActivityLog['actionType'], targetModule: string, details: string, adminOverride?: AdminUser) => {
-    let admin = adminOverride || currentAdmin;
-    if (!admin) {
-      const saved = localStorage.getItem('ts_current_admin');
-      if (saved && saved !== 'undefined') {
-        try {
-          admin = JSON.parse(saved);
-        } catch (e) {}
+  const loginAdmin = async (email: string, pass: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuthToken(data.token);
+        setCurrentAdmin(data.admin);
+        setIsAdminAuth(true);
+        return { success: true };
       }
+      return { success: false, error: data.error };
+    } catch (err: any) {
+      return { success: false, error: "Network error occurred." };
     }
-
-    const newLog: ActivityLog = {
-      id: generateId(),
-      adminId: admin?.id || 'system',
-      adminName: admin?.name || admin?.email?.split('@')[0] || 'System/Customer',
-      adminEmail: admin?.email || 'system@trendify.com',
-      actionType,
-      targetModule,
-      details,
-      timestamp: new Date().toISOString()
-    };
-    setActivityLogs(prev => [newLog, ...prev]);
-  };
-
-  const loginAdmin = (email: string, pass: string) => {
-    const found = admins.find(a => a.email.toLowerCase() === email.toLowerCase() && a.password === pass);
-    if (found) {
-      setCurrentAdmin(found);
-      setIsAdminAuth(true);
-      logActivity('auth', 'admins', `Admin logged in successfully: ${found.email} (${found.role})`, found);
-      return true;
-    }
-    logActivity('auth', 'admins', `Failed login attempt for email: ${email}`);
-    return false;
   };
 
   const logoutAdmin = () => {
-    if (currentAdmin) {
-      logActivity('auth', 'admins', `Admin logged out: ${currentAdmin.email}`);
-    }
     setCurrentAdmin(null);
+    setAuthToken(null);
     setIsAdminAuth(false);
+  };
+
+  const updateProfile = async (updates: Partial<AdminUser>) => {
+    if (!currentAdmin || !authToken) return { success: false, error: "Not authenticated" };
+    try {
+      const res = await fetch('/api/admin/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentAdmin.id, updates, token: authToken })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCurrentAdmin(data.admin);
+        // Update admin in list too
+        setAdmins(prev => prev.map(a => a.id === data.admin.id ? data.admin : a));
+        return { success: true };
+      }
+      return { success: false, error: data.error };
+    } catch (err: any) {
+      return { success: false, error: "Failed to update profile" };
+    }
   };
 
   const addAdmin = (admin: AdminUser) => {
     const updatedAdmins = [...admins, admin];
     setAdmins(updatedAdmins);
     serverSave('admins', updatedAdmins);
-    logActivity('create', 'admins', `Created admin account: "${admin.email}" (Name: ${admin.name}, Role: ${admin.role})`);
   };
 
   const updateAdmin = (admin: AdminUser) => {
     const updatedAdmins = admins.map(a => a.id === admin.id ? admin : a);
     setAdmins(updatedAdmins);
     serverSave('admins', updatedAdmins);
-    logActivity('update', 'admins', `Updated admin account/permissions: "${admin.email}" (Role: ${admin.role})`);
     if (currentAdmin && currentAdmin.id === admin.id) {
       setCurrentAdmin(admin);
     }
@@ -535,7 +643,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Hard delete from state so it propagates to server sync and gets removed from MongoDB
     const updatedAdmins = admins.filter(a => a.id !== id);
     setAdmins(updatedAdmins);
-    logActivity('delete', 'admins', `Deleted admin account: "${emailStr}"`);
     if (currentAdmin && currentAdmin.id === id) {
       setCurrentAdmin(null);
       setIsAdminAuth(false);
@@ -654,7 +761,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const now = new Date();
         const isNotExpired = !c.expiryDate || new Date(c.expiryDate) >= now;
         const isStarted = !c.startDate || new Date(c.startDate) <= now;
-        return c.code === couponCode && isActive && isNotExpired && isStarted;
+        return c.code.toLowerCase() === couponCode.toLowerCase() && isActive && isNotExpired && isStarted;
       });
       if (!coupon) {
         return { success: false, error: 'Invalid, inactive, not yet started, or expired coupon' };
@@ -667,7 +774,21 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    const total = subtotal - discount;
+    const shippingCharge = customer.district === 'Dhaka' ? 70 : 120;
+    const total = subtotal - discount + shippingCharge;
+
+    // Check stock availability
+    for (const item of cart) {
+        const product = products.find(p => p.id === item.id);
+        if (product) {
+            const stock = getProductStockForSize(product, item.selectedSize || 'M');
+            if (item.quantity > stock) {
+                return { success: false, error: `Product ${product.name} is out of stock or insufficient quantity for size ${item.selectedSize || 'M'}.` };
+            }
+        } else {
+            return { success: false, error: `Product not found: ${item.name}` };
+        }
+    }
 
     const newOrderId = `TND-${Date.now()}${(Math.random() * 1000).toFixed(0)}`;
 
@@ -677,6 +798,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       items: [...cart],
       subtotal,
       discount,
+      shippingCharge,
       total,
       couponCode,
       date: new Date().toISOString(),
@@ -707,7 +829,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setOrders(prev => [newOrder, ...prev]);
     clearCart();
-    logActivity('create', 'orders', `New order placed: ${newOrder.id} (Total: ৳${total}) by ${customer.name}`);
     return { success: true, orderId: newOrder.id };
   };
 
@@ -729,7 +850,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     setProducts(prev => [{ ...product, code, id: generateId() }, ...prev]);
-    logActivity('create', 'products', `Added product: "${product.name}" (Code: ${code}, Price: ৳${product.price})`);
   };
 
   const updateProduct = (product: Product) => {
@@ -749,31 +869,26 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     setProducts(prev => prev.map(p => p.id === product.id ? { ...product, code } : p));
-    logActivity('update', 'products', `Updated product: "${product.name}" (Code: ${code}, Price: ৳${product.price})`);
   };
 
   const deleteProduct = (id: string) => {
     const prod = products.find(p => p.id === id);
     const prodName = prod ? `"${prod.name}"` : `ID - ${id}`;
     setProducts(prev => prev.map(p => p.id === id ? { ...p, deleted: true } : p));
-    logActivity('delete', 'products', `Deleted product: ${prodName}`);
   };
 
   const addCoupon = (coupon: Omit<Coupon, 'id'>) => {
     setCoupons(prev => [{ ...coupon, id: generateId() }, ...prev]);
-    logActivity('create', 'coupons', `Added coupon: "${coupon.code}" (${coupon.discountValue}${coupon.discountType === 'percentage' ? '%' : ' ৳'} discount)`);
   };
 
   const updateCoupon = (coupon: Coupon) => {
     setCoupons(prev => prev.map(c => c.id === coupon.id ? coupon : c));
-    logActivity('update', 'coupons', `Updated coupon: "${coupon.code}" (${coupon.discountValue}${coupon.discountType === 'percentage' ? '%' : ' ৳'} discount)`);
   };
 
   const deleteCoupon = (id: string) => {
     const coup = coupons.find(c => c.id === id);
     const coupCode = coup ? `"${coup.code}"` : `ID - ${id}`;
     setCoupons(prev => prev.map(c => c.id === id ? { ...c, deleted: true } : c));
-    logActivity('delete', 'coupons', `Deleted coupon: ${coupCode}`);
   };
 
   const updateOrderStatus = (orderId: string, status: Order['status']) => {
@@ -826,141 +941,123 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return prev.map(o => o.id === orderId ? { ...o, status } : o);
     });
-    logActivity('update', 'orders', `Updated status of order "${orderId}" to "${status}"`);
   };
 
   const updateOrderNotes = (orderId: string, notes: string) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, notes } : o));
-    logActivity('update', 'orders', `Updated notes/history for order "${orderId}"`);
   };
 
   const deleteOrder = (id: string) => {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, deleted: true } : o));
-    logActivity('delete', 'orders', `Deleted order: "${id}"`);
   };
 
   const updateOrder = (order: Order) => {
     setOrders(prev => prev.map(o => o.id === order.id ? order : o));
-    logActivity('update', 'orders', `Customized details and items of order "${order.id}"`);
   };
 
   const addSlide = (slide: Omit<Slide, 'id'>) => {
     setSlides(prev => [{...slide, id: generateId()}, ...prev]);
-    logActivity('create', 'slides', `Added slider banner: "${slide.title || 'Untitled'}"`);
   };
   const updateSlide = (slide: Slide) => {
     setSlides(prev => prev.map(s => s.id === slide.id ? slide : s));
-    logActivity('update', 'slides', `Updated slider banner: "${slide.title || 'Untitled'}"`);
   };
   const deleteSlide = (id: string) => {
     setSlides(prev => prev.map(s => s.id === id ? { ...s, deleted: true } : s));
-    logActivity('delete', 'slides', `Deleted slider banner with ID: ${id}`);
   };
   
   const addCategoryBanner = (banner: Omit<CategoryBanner, 'id'>) => {
     setCategoryBanners(prev => [{...banner, id: generateId()}, ...prev]);
-    logActivity('create', 'categories', `Added category banner: "${banner.title || 'Untitled'}"`);
   };
   const updateCategoryBanner = (banner: CategoryBanner) => {
     setCategoryBanners(prev => prev.map(b => b.id === banner.id ? banner : b));
-    logActivity('update', 'categories', `Updated category banner: "${banner.title || 'Untitled'}"`);
   };
   const deleteCategoryBanner = (id: string) => {
     setCategoryBanners(prev => prev.map(b => b.id === id ? { ...b, deleted: true } : b));
-    logActivity('delete', 'categories', `Deleted category banner with ID: ${id}`);
+  };
+
+  const addCategory = (category: Omit<Category, 'id'>) => {
+    setCategories(prev => [{...category, id: generateId()}, ...prev]);
+  };
+  const updateCategory = (category: Category) => {
+    setCategories(prev => prev.map(c => c.id === category.id ? category : c));
+  };
+  const deleteCategory = (id: string) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, deleted: true } : c));
   };
 
   const addLookbookImage = (img: Omit<LookbookImage, 'id'>) => {
     setLookbook(prev => [{...img, id: generateId()}, ...prev]);
-    logActivity('create', 'lookbook', `Added lookbook item: "${img.title || 'Untitled'}"`);
   };
   const updateLookbookImage = (img: LookbookImage) => {
     setLookbook(prev => prev.map(l => l.id === img.id ? img : l));
-    logActivity('update', 'lookbook', `Updated lookbook item: "${img.title || 'Untitled'}"`);
   };
   const deleteLookbookImage = (id: string) => {
     setLookbook(prev => prev.map(l => l.id === id ? { ...l, deleted: true } : l));
-    logActivity('delete', 'lookbook', `Deleted lookbook item with ID: ${id}`);
   };
 
   const addSubscriber = (email: string) => {
-    if (!subscribers.find(s => s.email === email)) {
-      setSubscribers(prev => [{ id: generateId(), email, date: new Date().toISOString() }, ...prev]);
-      logActivity('create', 'subscribers', `New user subscribed to newsletter: ${email}`);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!subscribers.find(s => s.email && s.email.trim().toLowerCase() === normalizedEmail)) {
+      setSubscribers(prev => [{ id: generateId(), email: normalizedEmail, date: new Date().toISOString() }, ...prev]);
     }
   };
   const deleteSubscriber = (id: string) => {
     const sub = subscribers.find(s => s.id === id);
     const subEmail = sub ? sub.email : `ID - ${id}`;
     setSubscribers(prev => prev.map(s => s.id === id ? { ...s, deleted: true } : s));
-    logActivity('delete', 'subscribers', `Deleted subscriber: ${subEmail}`);
   };
 
   const addContactMessage = (msg: Omit<ContactMessage, 'id' | 'date'>) => {
     setContactMessages(prev => [{ ...msg, id: generateId(), date: new Date().toISOString() }, ...prev]);
-    logActivity('create', 'messages', `New contact message from: ${msg.name} (${msg.email})`);
   };
   const deleteContactMessage = (id: string) => {
     const msg = contactMessages.find(m => m.id === id);
     const msgSender = msg ? `${msg.name} (${msg.email})` : `ID - ${id}`;
     setContactMessages(prev => prev.map(m => m.id === id ? { ...m, deleted: true } : m));
-    logActivity('delete', 'messages', `Deleted contact message from: ${msgSender}`);
   };
 
   const addPopupAd = (ad: Omit<PopupAd, 'id'>) => {
     setPopupAds(prev => [{...ad, id: generateId()}, ...prev]);
-    logActivity('create', 'ads', `Created popup ad with image: "${ad.imageUrl}"`);
   };
   const deletePopupAd = (id: string) => {
     setPopupAds(prev => prev.map(a => a.id === id ? { ...a, deleted: true } : a));
-    logActivity('delete', 'ads', `Deleted popup ad with ID: ${id}`);
   };
   const updatePopupAd = (id: string, updatedAd: Partial<PopupAd>) => {
     setPopupAds(prev => prev.map(ad => ad.id === id ? { ...ad, ...updatedAd } : ad));
-    logActivity('update', 'ads', `Updated popup ad details for ID: ${id}`);
   };
 
   const addHomeAd = (ad: Omit<HomeAd, 'id'>) => {
     setHomeAds(prev => [{...ad, id: generateId()}, ...prev]);
-    logActivity('create', 'ads', `Created banner/home ad campaign: "${ad.title || 'Untitled'}"`);
   };
   const deleteHomeAd = (id: string) => {
     setHomeAds(prev => prev.map(a => a.id === id ? { ...a, deleted: true } : a));
-    logActivity('delete', 'ads', `Deleted banner/home ad campaign with ID: ${id}`);
   };
   const updateHomeAd = (ad: HomeAd) => {
     setHomeAds(prev => prev.map(a => a.id === ad.id ? ad : a));
-    logActivity('update', 'ads', `Updated banner/home ad campaign: "${ad.title || 'Untitled'}"`);
   };
 
   const addFAQ = (faq: Omit<FAQItem, 'id'>) => {
     setFaqs(prev => [{ ...faq, id: generateId() }, ...prev]);
-    logActivity('create', 'faqs', `Added FAQ item: "${faq.question}"`);
   };
   const updateFAQ = (faq: FAQItem) => {
     setFaqs(prev => prev.map(f => f.id === faq.id ? faq : f));
-    logActivity('update', 'faqs', `Updated FAQ item: "${faq.question}"`);
   };
   const deleteFAQ = (id: string) => {
     const item = faqs.find(f => f.id === id);
     const itemQuestion = item ? `"${item.question}"` : `ID - ${id}`;
     setFaqs(prev => prev.map(f => f.id === id ? { ...f, deleted: true } : f));
-    logActivity('delete', 'faqs', `Deleted FAQ: ${itemQuestion}`);
   };
 
   const addPolicy = (policy: Omit<PolicyItem, 'id'>) => {
     setPolicies(prev => [{ ...policy, id: generateId() }, ...prev]);
-    logActivity('create', 'policies', `Created policy page item: "${policy.title}"`);
   };
   const updatePolicy = (policy: PolicyItem) => {
     setPolicies(prev => prev.map(p => p.id === policy.id ? policy : p));
-    logActivity('update', 'policies', `Updated policy page item: "${policy.title}"`);
   };
   const deletePolicy = (id: string) => {
     const pol = policies.find(p => p.id === id);
     const polTitle = pol ? `"${pol.title}"` : `ID - ${id}`;
     setPolicies(prev => prev.map(p => p.id === id ? { ...p, deleted: true } : p));
-    logActivity('delete', 'policies', `Deleted policy item: ${polTitle}`);
   };
 
   const addOTP = (phone: string, otp: string, email?: string) => {
@@ -975,25 +1072,16 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       ...prev
     ]);
-    logActivity('create', 'otps', `OTP Code [${otp}] created & sent for phone tracker: ${phone} (Email: ${email || 'N/A'})`);
   };
 
   const deleteOTP = (id: string) => {
     const otpRec = otps.find(o => o.id === id);
     const details = otpRec ? `Deleted OTP code: [${otpRec.otp}] for phone: ${otpRec.phone || 'N/A'}` : `Deleted OTP ID: ${id}`;
     setOtps(prev => prev.map(o => o.id === id ? { ...o, deleted: true } : o));
-    logActivity('delete', 'otps', details);
   };
 
   if (!isDbLoaded) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex flex-col items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-black/10 dark:border-white/10 border-t-black dark:border-t-white rounded-full animate-spin"></div>
-          <p className="text-[10px] uppercase font-black tracking-widest text-gray-500 animate-pulse">অনলাইন ডাটাবেজ লোড করা হচ্ছে...</p>
-        </div>
-      </div>
-    );
+    return <DatabaseLoader />;
   }
 
   return (
@@ -1011,17 +1099,19 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       homeAds: homeAds.filter(a => !a.deleted), 
       faqs: faqs.filter(f => !f.deleted), 
       policies: policies.filter(p => !p.deleted), 
+      categories: categories.filter(c => !c.deleted),
       isAdminAuth,
+      authToken,
       currentAdmin, 
       admins: admins.filter(a => a.isActive !== false), 
       otps: otps.filter(o => !o.deleted), 
-      activityLogs, 
-      logActivity,
       getProductPriceForSize,
       getProductStockForSize,
       addToCart, removeFromCart, updateCartQuantity, updateCartItemSize, clearCart, placeOrder,
-      loginAdmin, logoutAdmin, addAdmin, updateAdmin, deleteAdmin, addProduct, updateProduct, deleteProduct,
-      addSlide, updateSlide, deleteSlide, addCategoryBanner, updateCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage,
+      loginAdmin, logoutAdmin, updateProfile, addAdmin, updateAdmin, deleteAdmin, addProduct, updateProduct, deleteProduct,
+      addSlide, updateSlide, deleteSlide, addCategoryBanner, updateCategoryBanner, deleteCategoryBanner, 
+      addCategory, updateCategory, deleteCategory,
+      addLookbookImage, updateLookbookImage, deleteLookbookImage,
       addCoupon, updateCoupon, deleteCoupon,
       updateOrderStatus, updateOrderNotes, updateOrder, deleteOrder,
       addSubscriber, deleteSubscriber, addContactMessage, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd,
@@ -1030,6 +1120,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addOTP, deleteOTP,
       isDarkMode, toggleDarkMode, isCartOpen, setIsCartOpen,
       wishlist, toggleWishlist,
+      comparisonItems, toggleComparison, clearComparison,
       reviews: reviews.filter(r => !r.deleted), addReview, updateReviewStatus, deleteReview
     }}>
       {children}

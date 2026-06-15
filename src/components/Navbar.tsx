@@ -18,7 +18,12 @@ export default function Navbar() {
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const lower = searchQuery.toLowerCase();
-    return products.filter(p => p.name.toLowerCase().includes(lower) || p.description.toLowerCase().includes(lower) || (p.code && p.code.toLowerCase().includes(lower))).slice(0, 5);
+    return products.filter(p => 
+      p.name.toLowerCase().includes(lower) || 
+      p.description.toLowerCase().includes(lower) || 
+      (p.category && p.category.toLowerCase().includes(lower)) ||
+      (p.code && p.code.toLowerCase().includes(lower))
+    ).slice(0, 5);
   }, [searchQuery, products]);
 
   useEffect(() => {
@@ -53,13 +58,13 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center text-2xl font-black tracking-tighter text-black dark:text-white">
-              TRENDIFY
+              NEONTHREAD
             </Link>
           </div>
  
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-500">
-            <Link to="/" className="text-black dark:text-white">Home</Link>
+          <div className="hidden md:flex items-center space-x-12 lg:space-x-16 text-sm font-medium text-gray-500">
+            <Link to="/" className="text-black dark:text-white ml-10">Home</Link>
             <Link to="/shop" className="hover:text-black dark:hover:text-white transition-colors">Shop</Link>
             <Link to="/contact" className="hover:text-black dark:hover:text-white transition-colors">Contact</Link>
             <Link to="/track-order" className="hover:text-black dark:hover:text-white transition-colors">Track Order</Link>

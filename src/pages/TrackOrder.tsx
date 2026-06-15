@@ -16,6 +16,7 @@ export default function TrackOrder() {
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [results, setResults] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   const handleIdSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,7 @@ export default function TrackOrder() {
     }
   };
 
-  const handleSendOtp = (e?: React.FormEvent) => {
+  const handleSendOtp = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     if (cleanPhone.length !== 11) {
@@ -66,6 +67,9 @@ export default function TrackOrder() {
       });
       return;
     }
+
+    setIsSending(true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // smooth visual feedback
 
     setAssociatedEmail(targetEmail);
 
@@ -98,6 +102,7 @@ export default function TrackOrder() {
     const masked = maskEmail(targetEmail);
 
     setStep('otp');
+    setIsSending(false);
     Swal.fire({
       icon: 'success',
       title: 'OTP মেইলে পাঠানো হয়েছে ✉️',
@@ -204,9 +209,9 @@ export default function TrackOrder() {
                       />
                       <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold border-r border-slate-200 dark:border-slate-600 pr-3">+88</div>
                     </div>
-                    <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none active:scale-95 flex items-center justify-center gap-2">
-                      Send OTP
-                      <Mail className="h-4 w-4" />
+                    <button type="submit" disabled={isSending} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50">
+                      {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
+                      {!isSending && <Mail className="h-4 w-4" />}
                     </button>
                   </form>
                 )}

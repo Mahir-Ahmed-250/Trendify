@@ -33,13 +33,13 @@ export default function ProductDetails() {
 
   const shareOnWhatsApp = () => {
     const url = encodeURIComponent(window.location.href);
-    const text = encodeURIComponent(`Check out this product on Trendify: ${product?.name}`);
+    const text = encodeURIComponent(`Check out this product on NeonThread: ${product?.name}`);
     window.open(`https://wa.me/?text=${text}%20${url}`, '_blank');
   };
 
   const shareOnTwitter = () => {
     const url = encodeURIComponent(window.location.href);
-    const text = encodeURIComponent(`Check out this product on Trendify: ${product?.name}`);
+    const text = encodeURIComponent(`Check out this product on NeonThread: ${product?.name}`);
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
   };
 
@@ -108,8 +108,8 @@ export default function ProductDetails() {
     return (
       <div className="flex-1 w-full bg-gray-50 py-20 flex flex-col items-center justify-center text-center">
         <Helmet>
-          <title>Product Not Found | Trendify</title>
-          <meta name="description" content="Look for the latest fashion trends at Trendify." />
+          <title>Product Not Found | NeonThread</title>
+          <meta name="description" content="Look for the latest fashion trends at NeonThread." />
         </Helmet>
         <h2 className="text-2xl font-black text-gray-900 mb-4 uppercase">Product Not Found</h2>
         <button onClick={() => navigate('/shop')} className="bg-black text-white px-8 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-gray-800 transition-colors">
@@ -202,8 +202,13 @@ export default function ProductDetails() {
       className="flex-1 w-full bg-white py-12 relative"
     >
       <Helmet>
-        <title>{product.name} | Trendify</title>
+        <title>{product.name} | NeonThread</title>
         <meta name="description" content={product.description} />
+        <meta property="og:title" content={`${product.name} | NeonThread`} />
+        <meta property="og:description" content={product.description} />
+        <meta property="og:image" content={product.image} />
+        <meta property="og:url" content={window.location.href} />
+        <meta property="og:type" content="product" />
       </Helmet>
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <button onClick={() => navigate(-1)} className="flex items-center text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-black transition-colors mb-8">
@@ -317,7 +322,7 @@ export default function ProductDetails() {
           {/* Product Info */}
           <div className="flex flex-col">
             <div className="flex justify-between items-center mb-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Trendify Exclusive</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">NeonThread Exclusive</p>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 pr-2 mr-2 border-r border-gray-100">
                   <button onClick={shareOnFacebook} className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors rounded-lg" title="Share on Facebook">

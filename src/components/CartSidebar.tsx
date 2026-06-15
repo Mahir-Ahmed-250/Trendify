@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, ArrowRight, X } from 'lucide-react';
 import { useShop } from '../ShopContext';
 import { motion, AnimatePresence } from 'motion/react';
-import Swal from 'sweetalert2';
+import { useToast } from './Toast';
 
 export default function CartSidebar() {
-  const { cart, removeFromCart, updateCartQuantity, updateCartItemSize, isCartOpen, setIsCartOpen, clearCart } = useShop();
+  const { cart, products, removeFromCart, updateCartQuantity, updateCartItemSize, isCartOpen, setIsCartOpen, clearCart } = useShop();
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -60,7 +61,7 @@ export default function CartSidebar() {
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-6">
                   <h2 className="text-xl font-black text-gray-900 dark:text-white mb-2 uppercase">Empty Cart</h2>
-                  <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium text-xs">Add some amazing t-shirts to your cart.</p>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium text-xs">Add some amazing products to your cart.</p>
                   <button
                     onClick={() => {
                       setIsCartOpen(false);
@@ -95,10 +96,27 @@ export default function CartSidebar() {
                             <div className="relative inline-block">
                               <select
                                 value={item.selectedSize || 'M'}
-                                onChange={(e) => updateCartItemSize(item.id, item.selectedSize || 'M', e.target.value)}
+                                onChange={(e) => {
+                                  const newSize = e.target.value;
+                                  updateCartItemSize(item.id, item.selectedSize || 'M', newSize);
+                                  updateCartQuantity(item.id, 1, newSize);
+                                  
+                                  const product = products.find(p => p.id === item.id);
+                                  const stock = product ? (product.sizeStocks ? product.sizeStocks[newSize] : product.stock) : 0;
+                                  
+                                  if (1 > (stock || 0)) {
+                                    addToast(`স্টক সীমিত। প্রোডাক্টের পরিমাণ ১ তে কমিয়ে দেওয়া হয়েছে।`, 'error');
+                                  }
+                                }}
                                 className="text-[9px] font-black uppercase text-gray-500 dark:text-gray-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded px-1 py-0.5 leading-none focus:outline-none focus:border-black dark:focus:border-white cursor-pointer"
                               >
-                                {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(sz => (
+                                {['S', 'M', 'L', 'XL', 'XXL', '3XL']
+                                  .filter(sz => {
+                                    const product = products.find(p => p.id === item.id);
+                                    const stock = product ? (product.sizeStocks ? product.sizeStocks[sz] : product.stock) : 0;
+                                    return (stock || 0) > 0;
+                                  })
+                                  .map(sz => (
                                   <option key={sz} value={sz} className="bg-white dark:bg-gray-900 text-gray-950 dark:text-gray-100">
                                     Size: {sz}
                                   </option>
@@ -120,17 +138,10 @@ export default function CartSidebar() {
                             <span className="w-6 text-center font-bold text-[10px] dark:text-white">{item.quantity}</span>
                             <button
                               onClick={() => {
-                                const stock = item.stock || 0;
-                                if (item.quantity >= stock) {
-                                  Swal.fire({
-                                    title: 'স্টকে নাই',
-                                    text: `দুঃখিত, এই প্রোডাক্টটি সর্বোচ্চ ${stock} টি স্টকে আছে।`,
-                                    icon: 'warning',
-                                    timer: 2000,
-                                    showConfirmButton: false,
-                                    toast: true,
-                                    position: 'top-end'
-                                  });
+                                const product = products.find(p => p.id === item.id);
+                                const stock = product ? (product.sizeStocks ? product.sizeStocks[item.selectedSize || 'M'] : product.stock) : 0;
+                                if (item.quantity >= (stock || 0)) {
+                                  addToast(`দুঃখিত, এই প্রোডাক্টটি সর্বোচ্চ ${stock} টি স্টকে আছে।`, 'error');
                                 } else {
                                   updateCartQuantity(item.id, item.quantity + 1, item.selectedSize);
                                 }
@@ -160,6 +171,17 @@ export default function CartSidebar() {
                 </div>
                 <button
                   onClick={() => {
+                    const outOfStockItems = cart.filter(item => {
+                      const product = products.find(p => p.id === item.id);
+                      if (!product) return true;
+                      const stock = product.sizeStocks ? product.sizeStocks[item.selectedSize || 'M'] : product.stock;
+                      return item.quantity > (stock || 0) || item.quantity <= 0;
+                    });
+
+                    if (outOfStockItems.length > 0) {
+                      addToast('কার্টে পর্যাপ্ত স্টক নেই অথবা প্রোডাক্টের পরিমাণ ঠিক নেই।', 'error');
+                      return;
+                    }
                     setIsCartOpen(false);
                     navigate('/checkout');
                   }}

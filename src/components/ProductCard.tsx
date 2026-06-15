@@ -1,16 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { ShoppingCart, Heart, Star, Check } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ShoppingCart, Heart, Star, Check, ArrowLeftRight } from 'lucide-react';
 import { Product } from '../types';
 import { useShop } from '../ShopContext';
+import { useToast } from './Toast';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function ProductCard({ product }: { product: Product, key?: React.Key }) {
-  const { addToCart, wishlist, toggleWishlist, reviews, cart } = useShop();
+  const { addToCart, wishlist, toggleWishlist, reviews, cart, comparisonItems, toggleComparison } = useShop();
+  const { addToast } = useToast();
   const [isAdded, setIsAdded] = useState(false);
+  const [showSizeModal, setShowSizeModal] = useState(false);
 
   const isOutOfStock = (product.stock || 0) <= 0;
   const isWishlisted = wishlist.includes(product.id);
+  const isComparing = comparisonItems.includes(product.id);
 
   const isProductInCart = useMemo(() => {
     return cart ? cart.some(item => item.id === product.id) : false;
@@ -30,6 +35,7 @@ export default function ProductCard({ product }: { product: Product, key?: React
     <motion.div 
       initial={{ opacity: 0, y: 30, scale: 0.95 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ y: -5 }}
       viewport={{ once: false, margin: "-50px" }}
       transition={{ 
         duration: 0.5,
@@ -37,7 +43,7 @@ export default function ProductCard({ product }: { product: Product, key?: React
         stiffness: 100,
         damping: 20
       }}
-      className="bg-white dark:bg-gray-900 p-3 rounded-2xl flex flex-col border border-gray-100 dark:border-gray-800 group relative relative hover:shadow-xl hover:shadow-black/5 transition-shadow"
+      className="bg-white dark:bg-gray-900 p-3 rounded-2xl flex flex-col border border-gray-100 dark:border-gray-800 group relative hover:shadow-xl hover:shadow-black/5 transition-shadow"
     >
       <Link to={`/product/${product.id}`} className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-xl mb-3 flex items-center justify-center relative overflow-hidden block">
         <img
@@ -69,6 +75,21 @@ export default function ProductCard({ product }: { product: Product, key?: React
           aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
         >
           <Heart size={14} fill={isWishlisted ? "currentColor" : "none"} className={isWishlisted ? "animate-pulse" : ""} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleComparison(product.id);
+          }}
+          className={`absolute top-12 right-2 p-2 rounded-full shadow-lg z-10 transition-all transform active:scale-95 ${
+            isComparing 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white/80 dark:bg-black/80 text-gray-900 dark:text-white hover:bg-white dark:hover:bg-black'
+          }`}
+          aria-label={isComparing ? "Remove from comparison" : "Add to comparison"}
+        >
+          <ArrowLeftRight size={14} />
         </button>
       </Link>
       <Link to={`/product/${product.id}`} className="flex justify-between items-start block mb-3 gap-2">
@@ -115,9 +136,12 @@ export default function ProductCard({ product }: { product: Product, key?: React
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (!isOutOfStock && !isAdded && !isProductInCart) {
+            if (product.sizeStocks) {
+                setShowSizeModal(true);
+            } else if (!isOutOfStock && !isAdded && !isProductInCart) {
               addToCart(product, 1);
               setIsAdded(true);
+              addToast('Product added to cart!', 'success');
               setTimeout(() => setIsAdded(false), 2000);
             }
           }}
@@ -142,6 +166,41 @@ export default function ProductCard({ product }: { product: Product, key?: React
             </>
           )}
         </button>
+        {createPortal(
+          <AnimatePresence>
+            {showSizeModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => setShowSizeModal(false)}>
+                <motion.div
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0.9 }}
+                  className="bg-white dark:bg-gray-800 p-6 rounded-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                    <h3 className="font-black uppercase mb-4 text-center dark:text-white text-sm">Select Size</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                        {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(sz => {
+                            const stock = product.sizeStocks ? product.sizeStocks[sz] : 0;
+                            return (
+                                <button key={sz} disabled={(stock || 0) <= 0} className="p-2 border rounded-lg text-xs font-black disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-300 dark:disabled:text-gray-500 hover:border-black transition-colors dark:text-white" onClick={(e) => {
+                                    e.stopPropagation();
+                                    addToCart(product, 1, sz);
+                                    setShowSizeModal(false);
+                                    addToast('Added to cart!', 'success');
+                                }}>
+                                    {sz} {(stock || 0) <= 0 ? '(Out)' : ''}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
         <Link
           to={isOutOfStock ? '#' : `/product/${product.id}`}
           onClick={(e) => {

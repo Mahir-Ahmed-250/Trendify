@@ -135,7 +135,7 @@ export default function Home() {
         className="py-12 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full"
       >
         <div className="flex items-end justify-between mb-6">
-          <h2 className="text-xl font-bold tracking-tight uppercase">Hot Sales <span className="text-red-500 ml-2">•</span></h2>
+          <h2 className="text-xl font-bold tracking-tight uppercase">Hot Sales <motion.span initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.8 }} className="text-red-500 ml-2">•</motion.span></h2>
           <Link to="/shop" className="text-xs font-bold text-gray-400 uppercase underline underline-offset-4 hover:text-black">
             View All
           </Link>
@@ -300,11 +300,9 @@ export default function Home() {
                     <span className="text-[9px] font-bold tracking-widest text-gray-300 drop-shadow-sm uppercase">Shop the Style</span>
                   </div>
 
-                  {idx === 0 && ( /* Shop the look pill on first image usually */
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <span className="bg-white text-black px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest shadow-xl">Shop The Look</span>
-                    </div>
-                  )}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <span className="bg-white text-black px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest shadow-xl">Shop The Look</span>
+                  </div>
                 </Link>
               ))}
           </div>

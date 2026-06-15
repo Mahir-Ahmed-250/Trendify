@@ -3,8 +3,8 @@ import Lottie from 'lottie-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, PieChart, Pie, Legend } from 'recharts';
 import { useShop } from '../ShopContext';
-import { Package, ShoppingBag, Ticket, Trash2, Plus, Minus, Edit, LogOut, Layout, Image, Camera, X, Users, Mail, MonitorPlay, Printer, HelpCircle, ShieldCheck, Ruler, ShoppingBasket, Home, TrendingUp, DollarSign, PackageCheck, UserCircle, Settings, Megaphone, MessageSquare, Search, Calendar, MapPin, Truck, CheckCircle, XCircle, Download, Clock, Bell, Key, History, Loader2, Star } from 'lucide-react';
-import { Product, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, LookbookImage, CategoryBanner, Coupon, Order, AdminPermissions, Review } from '../types';
+import { Package, ShoppingBag, Ticket, Trash2, Plus, Minus, Edit, LogOut, Layout, Image, Camera, X, Users, Mail, MonitorPlay, Printer, HelpCircle, ShieldCheck, ShieldAlert, Ruler, ShoppingBasket, Home, TrendingUp, DollarSign, PackageCheck, UserCircle, Settings, Megaphone, MessageSquare, Search, Calendar, MapPin, Truck, CheckCircle, XCircle, Download, Clock, Bell, Key, History, Loader2, Star, Tag, Layers, Check } from 'lucide-react';
+import { Product, Category, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, LookbookImage, CategoryBanner, Coupon, Order, AdminPermissions, Review } from '../types';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 import { compressImage, fileToBase64 } from '../lib/imageUtils';
@@ -28,397 +28,215 @@ const SummaryCard = ({ title, count, icon: Icon, alert }: { title: string, count
 const formatDate = (date: string | number | Date) => new Date(date).toLocaleDateString('en-GB');
 const formatTime = (date: string | number | Date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-function AdminActivityLogsView() {
-  const { activityLogs, admins } = useShop();
-  const [search, setSearch] = useState('');
-  const [actionFilter, setActionFilter] = useState('all');
-  const [moduleFilter, setModuleFilter] = useState('all');
-  const [adminFilter, setAdminFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
+function AdminCategoriesView() {
+    const { categories, addCategory, updateCategory, deleteCategory } = useShop();
+    const [isAdding, setIsAdding] = useState(false);
+    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [newCat, setNewCat] = useState({ name: '', slug: '' });
 
-  // Filter logic
-  const filteredLogs = (activityLogs || []).filter(log => {
-    const actType = log.actionType || (log as any).action || '';
-    const targetMod = log.targetModule || (log as any).module || '';
+    const resetForm = () => {
+      setNewCat({ name: '', slug: '' });
+      setEditingCategory(null);
+      setIsAdding(false);
+    };
 
-    // Search filter
-    const matchesSearch = 
-      (log.details || '').toLowerCase().includes(search.toLowerCase()) ||
-      (log.adminEmail || '').toLowerCase().includes(search.toLowerCase()) ||
-      actType.toLowerCase().includes(search.toLowerCase()) ||
-      targetMod.toLowerCase().includes(search.toLowerCase());
+    const handleSave = () => {
+      if (!newCat.name.trim()) return;
+      const slug = newCat.slug.trim() || newCat.name.trim().toLowerCase().replace(/\s+/g, '-');
       
-    // Action filter
-    let matchesAction = false;
-    if (actionFilter === 'all') {
-      matchesAction = true;
-    } else if (actionFilter === 'login') {
-      matchesAction = actType === 'auth' && (log.details || '').toLowerCase().includes('logged in');
-    } else if (actionFilter === 'logout') {
-      matchesAction = actType === 'auth' && (log.details || '').toLowerCase().includes('logged out');
-    } else {
-      matchesAction = actType === actionFilter;
-    }
-
-    // Module filter
-    const matchesModule = moduleFilter === 'all' || targetMod === moduleFilter;
-
-    // Admin filter
-    const matchesAdmin = adminFilter === 'all' || log.adminEmail === adminFilter;
-
-    // Date filter
-    let matchesDate = true;
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      const logDate = new Date(log.timestamp);
-      if (dateFilter === 'today') {
-        matchesDate = logDate.toDateString() === now.toDateString();
-      } else if (dateFilter === 'week') {
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        matchesDate = logDate >= sevenDaysAgo;
-      } else if (dateFilter === 'month') {
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        matchesDate = logDate >= thirtyDaysAgo;
+      if (editingCategory) {
+        updateCategory({ ...editingCategory, name: newCat.name.trim(), slug });
+        Swal.fire('Updated!', 'Category updated successfully.', 'success');
+      } else {
+        addCategory({ name: newCat.name.trim(), slug });
+        Swal.fire('Added!', 'New category added successfully.', 'success');
       }
-    }
+      resetForm();
+    };
 
-    return matchesSearch && matchesAction && matchesModule && matchesAdmin && matchesDate;
-  });
-
-  // Calculate high-quality analytics
-  const totalCount = filteredLogs.length;
-  const createCount = filteredLogs.filter(l => (l.actionType || (l as any).action) === 'create').length;
-  const updateCount = filteredLogs.filter(l => (l.actionType || (l as any).action) === 'update').length;
-  const deleteCount = filteredLogs.filter(l => (l.actionType || (l as any).action) === 'delete').length;
-
-  // Find most active admin in these filtered logs
-  const adminActivityCounts = filteredLogs.reduce((acc, log) => {
-    acc[log.adminEmail] = (acc[log.adminEmail] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  let mostActiveAdmin = 'N/A';
-  let maxActivity = 0;
-  Object.keys(adminActivityCounts).forEach(email => {
-    const count = adminActivityCounts[email];
-    if (count > maxActivity) {
-      maxActivity = count;
-      mostActiveAdmin = email;
-    }
-  });
-
-  // Export to Excel function using XLSX (already imported!)
-  const handleExport = () => {
-    if (filteredLogs.length === 0) {
-      Swal.fire({
-        icon: 'info',
-        title: 'No Data',
-        text: 'কোনো লগ ডাটা পাওয়া যায়নি এক্সপোর্ট করার জন্য।',
-        confirmButtonColor: '#3b82f6'
-      });
-      return;
-    }
-
-    const dataToExport = filteredLogs.map((log, index) => ({
-      Serial: index + 1,
-      Timestamp: new Date(log.timestamp).toLocaleString('en-US'),
-      AdminEmail: log.adminEmail,
-      Action: (log.actionType || (log as any).action || '').toUpperCase(),
-      Module: (log.targetModule || (log as any).module || '').toUpperCase(),
-      Details: log.details
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Activity Logs');
-    XLSX.writeFile(workbook, `Activity_Logs_${new Date().toISOString().split('T')[0]}.xlsx`);
-    
-    Swal.fire({
-      icon: 'success',
-      title: 'Export Success',
-      text: 'এক্সেল ফাইলে সব লগ সফলভাবে ডাউনলোড করা হয়েছে।',
-      timer: 1500,
-      showConfirmButton: false
-    });
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-100 pb-4 gap-4">
-        <div>
-          <h1 className="text-2xl font-black uppercase text-gray-900 tracking-tight flex items-center gap-2">
-            <History className="h-6 w-6 text-indigo-600" /> Activity & Audit Logs 📋
-          </h1>
-          <p className="text-xs text-gray-500 font-medium">কোন এডমিন কখন প্রোডাক্ট যোগ করল, অর্ডার আপডেট করল কিংবা কোনো কুপন মুছল—তাত্ক্ষণিকভাবে সম্পূর্ণ হিস্ট্রি ট্র্যাক করুন।</p>
-        </div>
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[11px] uppercase tracking-widest px-5 py-3 rounded-xl shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all text-center self-start md:self-auto"
-        >
-          <Download className="h-4 w-4" /> Export To Excel 📊
-        </button>
-      </div>
-
-      {/* Analytics widgets */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
-            <History className="h-5 w-5" />
-          </div>
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
           <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Actions</p>
-            <p className="text-xl font-black text-indigo-900">{totalCount}</p>
+            <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">Manage Categories 🏷️</h1>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">পণ্যগুলোর জন্য বিভিন্ন ক্যাটাগরি তৈরি ও সেটিং করুন।</p>
           </div>
+          <button 
+            onClick={() => setIsAdding(true)}
+            className="bg-black text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-black/10 hover:bg-gray-800 transition-all active:scale-95"
+          >
+            <Plus size={14} className="stroke-[3]" /> Add New Category
+          </button>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
-            <CheckCircle className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Creations</p>
-            <p className="text-xl font-black text-emerald-900">{createCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
-            <Calendar className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modifications</p>
-            <p className="text-xl font-black text-blue-900">{updateCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4 col-span-2 lg:col-span-1">
-          <div className="p-3 bg-rose-50 rounded-2xl text-rose-600">
-            <Trash2 className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Most Active Staff</p>
-            <p className="text-xs font-black text-rose-950 truncate max-w-[150px]" title={mostActiveAdmin}>
-              {mostActiveAdmin.split('@')[0]} ({maxActivity})
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter bars panel */}
-      <div className="bg-gray-50 border border-gray-200/60 p-4 rounded-3xl flex flex-col gap-4">
-        <div className="text-xs font-extrabold uppercase tracking-widest text-gray-500">Filter Parameters</div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search keyword..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-10 w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm"
-            />
-          </div>
-
-          {/* Action filter */}
-          <div>
-            <select
-              value={actionFilter}
-              onChange={e => setActionFilter(e.target.value)}
-              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
+        <AnimatePresence>
+          {isAdding && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-2xl shadow-black/5 space-y-6 relative overflow-hidden"
             >
-              <option value="all">⚡ All Operations</option>
-              <option value="create">🟢 Create</option>
-              <option value="update">🔵 Update</option>
-              <option value="delete">🔴 Delete</option>
-              <option value="login">🔐 Login</option>
-              <option value="logout">🚪 Logout</option>
-            </select>
-          </div>
+              <div className="absolute top-0 left-0 w-2 h-full bg-black"></div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
+                <div className="w-1.5 h-4 bg-black rounded-full"></div>
+                {editingCategory ? 'Edit Category' : 'Create New Category'}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Category Name (নাম)</label>
+                  <input 
+                    type="text" 
+                    value={newCat.name}
+                    onChange={e => setNewCat({ ...newCat, name: e.target.value })}
+                    placeholder="e.g. Premium T-Shirts"
+                    className="w-full text-xs font-bold border border-gray-100 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-black/5 focus:border-black outline-none bg-gray-50/50 focus:bg-white transition-all placeholder:text-gray-300" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Slug (ঐচ্ছিক স্ল্যাগ)</label>
+                  <input 
+                    type="text" 
+                    value={newCat.slug}
+                    onChange={e => setNewCat({ ...newCat, slug: e.target.value })}
+                    placeholder="e.g. premium-tshirts"
+                    className="w-full text-xs font-bold border border-gray-100 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-black/5 focus:border-black outline-none bg-gray-50/50 focus:bg-white transition-all placeholder:text-gray-300" 
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button 
+                  onClick={resetForm}
+                  className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleSave}
+                  className="bg-black text-white px-10 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-black/20 transition-all active:scale-95 hover:bg-gray-800"
+                >
+                  {editingCategory ? 'Update Category' : 'Save Category'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Module filter */}
-          <div>
-            <select
-              value={moduleFilter}
-              onChange={e => setModuleFilter(e.target.value)}
-              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
-            >
-              <option value="all">📂 All Sections</option>
-              <option value="products">🛍️ Products</option>
-              <option value="orders">📦 Orders</option>
-              <option value="coupons">🎟️ Coupons</option>
-              <option value="otps">🔑 OTP Secrets</option>
-              <option value="admins">👤 Staff Admins</option>
-              <option value="slides">🎦 Slider Banner</option>
-              <option value="categories">🏷️ Categories</option>
-              <option value="lookbook">📷 Lookbook</option>
-              <option value="subscribers">✉️ Subscribers</option>
-              <option value="messages">💬 Contact Messages</option>
-              <option value="ads">📣 Advertisements</option>
-              <option value="faqs">❓ FAQs</option>
-              <option value="policies">🛡️ Policies</option>
-            </select>
-          </div>
-
-          {/* Admin email filter */}
-          <div>
-            <select
-              value={adminFilter}
-              onChange={e => setAdminFilter(e.target.value)}
-              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
-            >
-              <option value="all">👥 All Admins</option>
-              {Array.from(new Set((activityLogs || []).map(l => l.adminEmail))).filter(Boolean).map(email => (
-                <option key={email} value={email}>
-                  👤 {email}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Date range filter */}
-          <div>
-            <select
-              value={dateFilter}
-              onChange={e => setDateFilter(e.target.value)}
-              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-950 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-sm cursor-pointer"
-            >
-              <option value="all">📅 All Time</option>
-              <option value="today">☀️ Today</option>
-              <option value="week">🗓️ Last 7 days</option>
-              <option value="month">🌙 Last 30 days</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Activity Logs Table */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden overflow-x-auto w-full">
+          <table className="w-full text-left">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Timestamp</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">User / Administrator</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Activity Type</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Target Module</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-gray-400">Audit Log Statement Summary</th>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="p-5 pl-10 font-black uppercase text-[10px] text-gray-400 tracking-widest">Category Name</th>
+                <th className="p-5 font-black uppercase text-[10px] text-gray-400 tracking-widest">URL Slug</th>
+                <th className="p-5 font-black uppercase text-[10px] text-gray-400 tracking-widest text-right pr-10">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredLogs.length === 0 ? (
+              {categories.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 px-6 text-center text-gray-400 font-extrabold text-xs uppercase tracking-widest">
-                     কোনো একটিভিটি রেকর্ড পাওয়া যায়নি!
+                  <td colSpan={3} className="p-20 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center">
+                        <TrendingUp className="h-8 w-8 text-gray-200" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-black uppercase tracking-widest text-xs text-gray-900">No categories found</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">শুরু করতে নতুন ক্যাটাগরি যোগ করুন।</p>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map(log => {
-                  const actType = log.actionType || (log as any).action || '';
-                  const targetMod = log.targetModule || (log as any).module || '';
-
-                  // Badge color scheme
-                  const actionColors: Record<string, string> = {
-                    create: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                    update: 'bg-blue-50 text-blue-700 border-blue-100',
-                    delete: 'bg-rose-50 text-rose-700 border-rose-100',
-                    login: 'bg-amber-50 text-amber-700 border-amber-100',
-                    logout: 'bg-purple-50 text-purple-700 border-purple-100',
-                    auth: 'bg-amber-50 text-amber-700 border-amber-100'
-                  };
-
-                  let displayAction = actType;
-                  if (actType === 'auth') {
-                    if ((log.details || '').toLowerCase().includes('logged out')) {
-                      displayAction = 'logout';
-                    } else {
-                      displayAction = 'login';
-                    }
-                  }
-
-                  const currentActionColor = actionColors[displayAction] || 'bg-gray-100 text-gray-700 border-gray-200';
-
-                  return (
-                    <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                      {/* Timestamp */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-extrabold text-gray-900">
-                            {formatDate(log.timestamp)}
-                          </span>
-                          <span className="text-[10px] text-gray-400 font-black tracking-widest flex items-center gap-1 mt-0.5">
-                            <Clock className="h-3 w-3 inline text-indigo-400" /> {formatTime(log.timestamp)}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Admin User */}
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-black text-xs text-indigo-700 uppercase">
-                            {log.adminEmail ? log.adminEmail.charAt(0) : 'A'}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-extrabold text-gray-900 truncate max-w-[150px]" title={log.adminEmail}>
-                              {log.adminEmail}
-                            </span>
-                            {admins?.find(a => a.email === log.adminEmail)?.role === 'super' ? (
-                              <span className="text-[8px] font-black uppercase text-amber-600 block mt-0.5">👑 Super Admin</span>
-                            ) : (
-                              <span className="text-[8px] font-black uppercase text-gray-400 block mt-0.5">🛡️ Staff Admin</span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Activity Type badge */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${currentActionColor}`}>
-                          {displayAction}
-                        </span>
-                      </td>
-
-                      {/* Target Section */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        <span className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-md bg-gray-100 border border-gray-200 text-gray-600 font-mono">
-                          {targetMod}
-                        </span>
-                      </td>
-
-                      {/* Log description */}
-                      <td className="py-4 px-6">
-                        <p className="text-xs font-bold text-gray-700 break-words leading-relaxed max-w-[400px]">
-                          {log.details}
-                        </p>
-                      </td>
-                    </tr>
-                  );
-                })
+                categories.map(cat => (
+                  <tr key={cat.id} className="group hover:bg-gray-50/30 transition-colors">
+                    <td className="p-5 pl-10">
+                      <div className="flex items-center gap-3">
+                        <div className="w-1.5 h-1.5 bg-black rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <span className="font-black text-xs text-gray-900 uppercase tracking-tight">{cat.name}</span>
+                      </div>
+                    </td>
+                    <td className="p-5">
+                      <span className="px-3 py-1 font-mono text-[9px] font-black uppercase text-gray-400 bg-gray-50 border border-gray-100 rounded-lg group-hover:bg-white transition-colors">
+                        /shop?category={cat.slug}
+                      </span>
+                    </td>
+                    <td className="p-5 text-right pr-10">
+                      <div className="flex justify-end gap-1.5">
+                        <button 
+                          onClick={() => {
+                            setEditingCategory(cat);
+                            setNewCat({ name: cat.name, slug: cat.slug });
+                            setIsAdding(true);
+                          }}
+                          className="p-2.5 text-gray-400 hover:text-black hover:bg-white hover:shadow-lg hover:shadow-black/5 rounded-xl transition-all"
+                          title="Edit"
+                        >
+                          <Edit size={16} className="stroke-[2.5]" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            Swal.fire({
+                              title: 'Are you sure?',
+                              text: "এটি ডিলিট করলে এর অধীনে থাকা প্রোডাক্টগুলো ক্যাটাগরিহীন হয়ে যাবে।",
+                              icon: 'warning',
+                              showCancelButton: true,
+                              confirmButtonColor: '#000',
+                              cancelButtonColor: '#ff4b4b',
+                              confirmButtonText: 'Delete Permanently',
+                              cancelButtonText: 'Cancel',
+                              background: '#fff',
+                              customClass: {
+                                title: 'font-black uppercase tracking-tight text-xl',
+                                confirmButton: 'font-black uppercase tracking-widest text-[10px] px-8 py-3 rounded-xl shadow-xl shadow-red-500/10',
+                                cancelButton: 'font-black uppercase tracking-widest text-[10px] px-8 py-3 rounded-xl'
+                              }
+                            }).then((result) => {
+                              if (result.isConfirmed) {
+                                deleteCategory(cat.id);
+                                Swal.fire({
+                                  title: 'Deleted!',
+                                  text: 'ক্যাটাগরি সফলভাবে ডিলিট করা হয়েছে।',
+                                  icon: 'success',
+                                  confirmButtonColor: '#000'
+                                });
+                              }
+                            });
+                          }}
+                          className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} className="stroke-[2.5]" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 function AdminOTPView() {
   const { otps, deleteOTP, currentAdmin } = useShop();
   const [searchQuery, setSearchQuery] = useState('');
   
-  const filteredOtps = (otps || []).filter(o => 
-    (o.phone || '').includes(searchQuery) || 
-    (o.email || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (o.otp || '').includes(searchQuery)
-  );
+  const filteredOtps = (otps || []).filter(o => {
+    const phoneStr = String(o.phone || '');
+    const emailStr = String(o.email || '').toLowerCase();
+    const otpStr = String(o.otp || '');
+    return phoneStr.includes(searchQuery) || 
+           emailStr.includes(searchQuery.toLowerCase()) || 
+           otpStr.includes(searchQuery);
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight">Track Order OTPs 🔑</h1>
+          <h1 className="text-2xl font-black uppercase tracking-tight">Track Order OTPs</h1>
          
         </div>
         <div className="relative w-full md:w-80">
@@ -449,7 +267,7 @@ function AdminOTPView() {
               {filteredOtps.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-xs text-gray-400 font-bold uppercase tracking-widest">
-                    কোনো OTP পাওয়া যায়নি!
+                    No OTP records found
                   </td>
                 </tr>
               ) : (
@@ -468,9 +286,10 @@ function AdminOTPView() {
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className="text-xs text-gray-500 font-bold">
-                        {new Date(record.createdAt).toLocaleString('bn-BD', { hour12: true })}
-                      </span>
+                      <div className="text-xs text-gray-500 font-bold leading-relaxed">
+                        <div>{new Date(record.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                        <div className="text-[10px] text-gray-400 font-medium uppercase">{new Date(record.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
+                      </div>
                     </td>
                     <td className="p-4">
                       {record.verified ? (
@@ -520,6 +339,7 @@ function AdminOTPView() {
 
 function AdminReviewsView() {
   const { reviews, products, updateReviewStatus, deleteReview } = useShop();
+  console.log('Reviews:', reviews);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Review['status']>('all');
 
@@ -685,8 +505,19 @@ function AdminReviewsView() {
   );
 }
 
+const getOrderTotals = (order: any) => {
+  const defaultShipping = order.customer?.district === 'Dhaka' ? 70 : 120;
+  const actualShipping = order.shippingCharge !== undefined ? order.shippingCharge : defaultShipping;
+  
+  const expectedOldTotal = order.subtotal - order.discount;
+  const isShippingMissing = Math.abs(order.total - expectedOldTotal) < 0.01;
+  const actualTotalPayable = isShippingMissing ? order.total + actualShipping : order.total;
+  
+  return { actualShipping, actualTotalPayable };
+};
+
 export default function AdminDashboard() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<{
     connected: boolean;
     uri_configured: boolean;
@@ -701,7 +532,9 @@ export default function AdminDashboard() {
       .then(data => setDbStatus(data))
       .catch(err => console.error('Error fetching db status:', err));
   }, []);
-  const { products, reviews, updateReviewStatus, deleteReview, orders, coupons, slides, updateSlide, categoryBanners, updateCategoryBanner, lookbook, subscribers, contactMessages, popupAds, homeAds, faqs, policies, addProduct, updateProduct, deleteProduct, updateOrderStatus, updateOrderNotes, updateOrder, deleteOrder, addCoupon, updateCoupon, deleteCoupon, addSlide, deleteSlide, addCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage, deleteSubscriber, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd, addHomeAd, deleteHomeAd, updateHomeAd, addFAQ, updateFAQ, deleteFAQ, addPolicy, updatePolicy, deletePolicy, isAdminAuth, loginAdmin, logoutAdmin, currentAdmin, admins, addAdmin, updateAdmin, deleteAdmin } = useShop();
+  const { products, reviews, updateReviewStatus, deleteReview, orders, coupons, slides, updateSlide, categoryBanners, updateCategoryBanner, lookbook, subscribers, contactMessages, popupAds, homeAds, faqs, policies, categories, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct, updateOrderStatus, updateOrderNotes, updateOrder, deleteOrder, addCoupon, updateCoupon, deleteCoupon, addSlide, deleteSlide, addCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage, deleteSubscriber, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd, addHomeAd, deleteHomeAd, updateHomeAd, addFAQ, updateFAQ, deleteFAQ, addPolicy, updatePolicy, deletePolicy, isAdminAuth, loginAdmin, logoutAdmin, updateProfile, currentAdmin, admins, addAdmin, updateAdmin, deleteAdmin } = useShop();
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'shop' | 'collection' | 'orders' | 'coupons' | 'slides' | 'categories' | 'lookbook' | 'subscribers' | 'messages' | 'ads' | 'faqs' | 'policies' | 'admins' | 'profile' | 'reviews' | 'activities' | 'otps'>('dashboard');
   const [isAddingFAQ, setIsAddingFAQ] = useState(false);
   const [editingFAQ, setEditingFAQ] = useState<FAQItem | null>(null);
@@ -752,6 +585,11 @@ export default function AdminDashboard() {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
+    // Close sidebar on mobile/tablet when tab changes
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+    
     // Reset order search and filters when switching tabs to ensure freshness
     setOrderSearchQuery('');
     setAppliedOrderQuery('');
@@ -772,7 +610,7 @@ export default function AdminDashboard() {
   const unreadPendingReviews = pendingReviews.filter(r => !readReviewIds.includes(r.id));
 
   // Analytics
-  const activeOrders = orders.filter(o => o.status !== 'cancelled');
+  const activeOrders = orders.filter(o => o.status === 'delivered');
   const orderItems = activeOrders.flatMap(o => o.items);
   const salesMap = orderItems.reduce((acc, item) => {
     acc[item.id] = (acc[item.id] || 0) + item.quantity;
@@ -780,7 +618,8 @@ export default function AdminDashboard() {
   }, {} as Record<string, number>);
 
   const bestSellingProducts = products
-    .map(p => ({ ...p, totalSold: salesMap[p.id] || 0 }))
+    .filter(p => (salesMap[p.id] || 0) > 0)
+    .map(p => ({ ...p, totalSold: salesMap[p.id] }))
     .sort((a, b) => b.totalSold - a.totalSold)
     .slice(0, 5);
 
@@ -872,19 +711,7 @@ export default function AdminDashboard() {
   };
 
   const handlePrintInvoice = (order: any) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      Swal.fire({
-        title: 'পপআপ ব্লকড!',
-        text: 'অনুগ্রহ করে পপআপ উইন্ডো চালু করুন ইনভয়েস প্রিন্ট করার জন্য।',
-        icon: 'warning',
-        confirmButtonColor: '#000'
-      });
-      return;
-    }
-
-    const hasDhaka = order.customer.address.includes('District: Dhaka') || order.customer.address.toLowerCase().includes('dhaka');
-    const shippingCharge = hasDhaka ? 70 : 120;
+    const { actualShipping, actualTotalPayable } = getOrderTotals(order);
 
     const itemsHtml = order.items.map((item: any) => `
       <tr>
@@ -907,7 +734,7 @@ export default function AdminDashboard() {
         <table class="header-table">
           <tr>
             <td>
-              <h1 class="company">TRENDIFY</h1>
+              <h1 class="company">NEONTHREAD</h1>
             </td>
             <td class="label">INVOICE (মেমো)</td>
           </tr>
@@ -939,7 +766,7 @@ export default function AdminDashboard() {
             <h3>Shipping Address (ডেলিভারি ঠিকানা)</h3>
             <p><strong>Name:</strong> ${order.customer.name}</p>
             <p><strong>Phone:</strong> ${order.customer.phone}</p>
-            <p><strong>Email:</strong> ${order.customer.email}</p>
+            <p><strong>Email:</strong> ${order.customer.email || 'N/A'}</p>
             <p><strong>District:</strong> ${order.customer.district || 'N/A'}</p>
             <p><strong>Address:</strong> ${order.customer.address}</p>
           </div>
@@ -957,17 +784,17 @@ export default function AdminDashboard() {
             ` : ''}
             <div class="total-row">
               <span style="color: #666;">Shipping:</span>
-              <strong>৳${shippingCharge.toFixed(2)}</strong>
+              <strong>৳${actualShipping.toFixed(2)}</strong>
             </div>
             <div class="total-row grand-total">
               <span>Total Amount:</span>
-              <strong style="color: #000; font-size: 11px;">৳${order.total.toFixed(2)}</strong>
+              <strong style="color: #000; font-size: 11px;">৳${actualTotalPayable.toFixed(2)}</strong>
             </div>
           </div>
         </div>
 
         <div class="footer-info">
-          <p style="font-size: 9px; font-weight: bold; color: #111; margin: 0;">Thank you for shopping with TRENDIFY!</p>
+          <p style="font-size: 9px; font-weight: bold; color: #111; margin: 0;">Thank you for shopping with NEONTHREAD!</p>
           <p style="font-size: 8px; color: #999; margin: 1px 0 0 0;">This is a computer-generated document. No signature is required.</p>
         </div>
       </div>
@@ -978,7 +805,7 @@ export default function AdminDashboard() {
         <table class="header-table">
           <tr>
             <td>
-              <h1 class="company">TRENDIFY</h1>
+              <h1 class="company">NEONTHREAD</h1>
             </td>
             <td class="label">INVOICE (মেমো)</td>
           </tr>
@@ -1010,7 +837,7 @@ export default function AdminDashboard() {
             <h3>Shipping Address (ডেলিভারি ঠিকানা)</h3>
             <p><strong>Name:</strong> ${order.customer.name}</p>
             <p><strong>Phone:</strong> ${order.customer.phone}</p>
-            <p><strong>Email:</strong> ${order.customer.email}</p>
+            <p><strong>Email:</strong> ${order.customer.email || 'N/A'}</p>
             <p><strong>District:</strong> ${order.customer.district || 'N/A'}</p>
             <p><strong>Address:</strong> ${order.customer.address}</p>
           </div>
@@ -1028,23 +855,33 @@ export default function AdminDashboard() {
             ` : ''}
             <div class="total-row">
               <span style="color: #666;">Shipping:</span>
-              <strong>৳${shippingCharge.toFixed(2)}</strong>
+              <strong>৳${actualShipping.toFixed(2)}</strong>
             </div>
             <div class="total-row grand-total">
               <span>Total Amount:</span>
-              <strong style="color: #000; font-size: 11px;">৳${order.total.toFixed(2)}</strong>
+              <strong style="color: #000; font-size: 11px;">৳${actualTotalPayable.toFixed(2)}</strong>
             </div>
           </div>
         </div>
 
         <div class="footer-info">
-          <p style="font-size: 9px; font-weight: bold; color: #111; margin: 0;">Thank you for shopping with TRENDIFY!</p>
+          <p style="font-size: 9px; font-weight: bold; color: #111; margin: 0;">Thank you for shopping with NEONTHREAD!</p>
           <p style="font-size: 8px; color: #999; margin: 1px 0 0 0;">This is a computer-generated document. No signature is required.</p>
         </div>
       </div>
     `;
 
-    printWindow.document.write(`
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+        doc.open();
+        doc.write(`
       <html>
         <head>
           <title>Invoice - Order #${order.id}</title>
@@ -1122,8 +959,6 @@ export default function AdminDashboard() {
           </style>
         </head>
         <body>
-          <button class="no-print" onclick="window.print()" style="position: fixed; top: 15px; right: 20px; background: #000; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 11px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999;">Print / ডাউনলোড</button>
-          
           <div class="print-container">
             ${singleInvoiceHtml}
             
@@ -1137,13 +972,17 @@ export default function AdminDashboard() {
           <script>
             window.onload = function() {
               window.print();
+              setTimeout(() => {
+                window.parent.document.body.removeChild(window.frameElement);
+              }, 1000);
             }
           </script>
         </body>
       </html>
     `);
 
-    printWindow.document.close();
+        doc.close();
+    }
   };
 
   // Login states
@@ -1163,6 +1002,7 @@ export default function AdminDashboard() {
     orders: true,
     coupons: true,
     slides: true,
+    categoryBanners: true,
     categories: true,
     lookbook: true,
     subscribers: true,
@@ -1170,9 +1010,8 @@ export default function AdminDashboard() {
     ads: true,
     faqs: true,
     policies: true,
-    otps: false,
-    otpsDelete: false,
-    activityLogs: false,
+    otps: true,
+    otpsDelete: true,
     reviews: true,
     notifications: true
   });
@@ -1184,6 +1023,8 @@ export default function AdminDashboard() {
         dashboard: 'dashboard',
         shop: 'products',
         categories: 'categories',
+        collection: 'categories', // Or products? Usually banners are in Categories Banner now
+        categoriesBanner: 'categoryBanners',
         lookbook: 'lookbook',
         orders: 'orders',
         coupons: 'coupons',
@@ -1193,17 +1034,17 @@ export default function AdminDashboard() {
         subscribers: 'subscribers',
         messages: 'messages',
         policies: 'policies',
-        otps: 'otps',
-        activities: 'activityLogs'
+        otps: 'otps'
       };
 
       const requiredPermission = activeTabMap[activeTab];
-      if (requiredPermission && !currentAdmin.permissions?.[requiredPermission]) {
+      if (requiredPermission && currentAdmin.permissions && currentAdmin.permissions[requiredPermission] === false) {
         // Redirection logic
         const permissibleTabs: typeof activeTab[] = [];
         if (currentAdmin.permissions?.dashboard) permissibleTabs.push('dashboard');
         if (currentAdmin.permissions?.products) permissibleTabs.push('shop');
         if (currentAdmin.permissions?.categories) permissibleTabs.push('categories');
+        if (currentAdmin.permissions?.categoryBanners) permissibleTabs.push('categoriesBanner');
         if (currentAdmin.permissions?.lookbook) permissibleTabs.push('lookbook');
         if (currentAdmin.permissions?.orders) permissibleTabs.push('orders');
         if (currentAdmin.permissions?.coupons) permissibleTabs.push('coupons');
@@ -1214,7 +1055,6 @@ export default function AdminDashboard() {
         if (currentAdmin.permissions?.messages) permissibleTabs.push('messages');
         if (currentAdmin.permissions?.policies) permissibleTabs.push('policies');
         if (currentAdmin.permissions?.otps) permissibleTabs.push('otps');
-        if (currentAdmin.permissions?.activityLogs) permissibleTabs.push('activities');
 
         if (permissibleTabs.length > 0) {
           setActiveTab(permissibleTabs[0]);
@@ -1225,8 +1065,15 @@ export default function AdminDashboard() {
     }
   }, [currentAdmin, activeTab]);
 
-  // Form states
-  const [newProduct, setNewProduct] = useState({ name: '', price: 0, oldPrice: 0, image: '', description: '', isHotSale: false, isCollection: false, sizeChartImage: '', category: 'Basic', code: '', images: [''] as string[], serial: 0, stock: 50, sizePrices: {} as Record<string, number>, sizeStocks: {} as Record<string, number> });
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
+  const [isForgotPasswordFlow, setIsForgotPasswordFlow] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<'email' | 'otp' | 'reset'>('email');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOTP, setForgotOTP] = useState('');
+  const [newForgotPassword, setNewForgotPassword] = useState('');
+
+  // Form states (Default stock is now 0)
+  const [newProduct, setNewProduct] = useState({ name: '', price: 0, oldPrice: 0, image: '', description: '', isHotSale: false, isCollection: false, sizeChartImage: '', category: 'Basic', code: '', images: [''] as string[], serial: 0, stock: 0, sizePrices: {} as Record<string, number>, sizeStocks: {} as Record<string, number> });
   const [newCoupon, setNewCoupon] = useState({ code: '', discountValue: 0, discountType: 'percentage' as 'percentage' | 'amount', isActive: true, startDate: '', expiryDate: '' });
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [newSlide, setNewSlide] = useState({ title: '', subtitle: '', image: '', tagText: '', link: '' });
@@ -1415,9 +1262,11 @@ export default function AdminDashboard() {
   const [adminSortBy, setAdminSortBy] = useState('newest');
 
   const adminCategories = React.useMemo(() => {
-    const list = new Set(products.map(p => p.category));
-    return ['all', ...Array.from(list)];
-  }, [products]);
+    const fromProducts = new Set(products.map(p => p.category));
+    const fromList = new Set(categories.map(c => c.name));
+    const combined = new Set([...Array.from(fromProducts), ...Array.from(fromList)]);
+    return ['all', ...Array.from(combined)].filter(Boolean);
+  }, [products, categories]);
 
   const filteredAdminProducts = React.useMemo(() => {
     return products
@@ -1450,11 +1299,14 @@ export default function AdminDashboard() {
       .sort((a, b) => (a.serial || 0) - (b.serial || 0));
   }, [products]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = loginAdmin(email, password);
-    if (!success) {
-      setLoginError('Invalid email or password');
+    setLoginError('');
+    setIsLoggingIn(true);
+    const result = await loginAdmin(email, password);
+    setIsLoggingIn(false);
+    if (!result.success) {
+      setLoginError(result.error || 'Invalid email or password');
     } else {
       setLoginError('');
       setEmail('');
@@ -1464,43 +1316,232 @@ export default function AdminDashboard() {
 
   if (!isAdminAuth) {
     return (
-      <div className="flex-1 w-full bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl border border-gray-100 max-w-sm w-full shadow-sm text-center">
-          <div className="w-32  mx-auto mb-6">
-           
+      <div className="flex-1 w-full bg-gray-50 flex items-center justify-center p-4 min-h-screen font-sans">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white p-8 md:p-10 rounded-[32px] border border-gray-100 max-w-sm w-full shadow-2xl shadow-black/5 text-center relative overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 w-full h-2 bg-black"></div>
+          
+          <div className="w-20 h-20 bg-gray-50 rounded-3xl mx-auto mb-8 flex items-center justify-center border border-gray-100 shadow-inner">
+            <UserCircle size={40} className="text-black stroke-[1.5]" />
           </div>
-          <h1 className="text-2xl font-black uppercase mb-2">Admin Login</h1>
-         
-          <form onSubmit={handleLogin} className="space-y-4 text-left">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-gray-400">Email Admin</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:bg-white focus:ring-1 focus:ring-black focus:outline-none" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-gray-400">Password</label>
-              <input type={showPassword ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:bg-white focus:ring-1 focus:ring-black focus:outline-none" />
-            </div>
-            
-            {/* Show Password Option */}
-            <div className="flex items-center gap-2 py-1">
-              <input 
-                id="showPassword"
-                type="checkbox" 
-                checked={showPassword} 
-                onChange={e => setShowPassword(e.target.checked)} 
-                className="rounded border-gray-300 text-black focus:ring-black cursor-pointer h-4 w-4" 
-              />
-              <label htmlFor="showPassword" className="text-xs font-bold text-gray-500 select-none cursor-pointer">
-                Show Password
-              </label>
-            </div>
 
-            {loginError && <p className="text-red-500 text-xs font-bold">{loginError}</p>}
-            <button type="submit" className="w-full py-3 bg-black text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-xl shadow-black/10 mt-2 active:scale-95 transition-transform">
-              Login to Dashboard
-            </button>
-          </form>
-        </div>
+          {!isForgotPasswordFlow ? (
+            <>
+              <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900 mb-2">Admin Login</h1>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-8">প্যানেল এক্সেস করতে লগইন করুন</p>
+            
+              <form onSubmit={handleLogin} className="space-y-5 text-left">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Email Address</label>
+                  <input 
+                    type="email" 
+                    required 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)} 
+                    placeholder="admin@neonthread.com"
+                    className="w-full text-xs font-bold border border-gray-100 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-black/5 focus:border-black outline-none bg-gray-50/50 focus:bg-white transition-all" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password</label>
+                    <button 
+                      type="button"
+                      onClick={() => setIsForgotPasswordFlow(true)}
+                      className="text-[9px] font-black uppercase tracking-widest text-black hover:underline"
+                    >
+                      Forgot?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      required 
+                      value={password} 
+                      onChange={e => setPassword(e.target.value)} 
+                      placeholder="••••••••"
+                      className="w-full text-xs font-bold border border-gray-100 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-black/5 focus:border-black outline-none bg-gray-50/50 focus:bg-white transition-all pr-12" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
+                    >
+                      {showPassword ? <ShieldAlert size={18} /> : <ShieldCheck size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {loginError && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-2 text-red-500 bg-red-50 border border-red-100 p-3 rounded-xl"
+                  >
+                    <ShieldAlert size={14} />
+                    <p className="text-[10px] font-bold uppercase tracking-wider">{loginError}</p>
+                  </motion.div>
+                )}
+
+                <button 
+                  type="submit" 
+                  disabled={isLoggingIn}
+                  className="w-full py-4.5 bg-black text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-2xl shadow-black/20 mt-4 active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {isLoggingIn ? <Loader2 className="animate-spin h-4 w-4" /> : 'Enter Dashboard'}
+                </button>
+                
+                <p className="text-[9px] text-center text-gray-400 font-bold uppercase tracking-widest mt-6">
+                  Design & Developed by <span className="text-black">NEONTHREAD</span>
+                </p>
+              </form>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-2 justify-center">
+                <button 
+                  onClick={() => {
+                    setIsForgotPasswordFlow(false);
+                    setForgotPasswordStep('email');
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-black"
+                >
+                  <X size={16} />
+                </button>
+                <h1 className="text-xl font-black uppercase tracking-tight text-gray-900">Forgot Password</h1>
+              </div>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-8">পাসওয়ার্ড পুনর্দ্ধার করতে মেইল ভেরিফাই করুন</p>
+
+              {forgotPasswordStep === 'email' && (
+                <div className="space-y-5 text-left">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Admin Email</label>
+                    <input 
+                      type="email" 
+                      value={forgotEmail} 
+                      onChange={e => setForgotEmail(e.target.value)} 
+                      placeholder="Enter registered email"
+                      className="w-full text-xs font-bold border border-gray-100 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-black/5 focus:border-black outline-none bg-gray-50/50 focus:bg-white transition-all" 
+                    />
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      if (!forgotEmail) { Swal.fire('Error', 'Please enter email', 'error'); return; }
+                      setIsForgotLoading(true);
+                      try {
+                        const res = await fetch('/api/auth/forgot-password', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: forgotEmail })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setForgotPasswordStep('otp');
+                          Swal.fire('Code Sent!', 'ভেরিফিকেশন কোড আপনার মেইলে পাঠানো হয়েছে।', 'success');
+                        } else {
+                          Swal.fire('Error', data.error || 'Failed to send code', 'error');
+                        }
+                      } catch (err) {
+                        Swal.fire('Error', 'Something went wrong', 'error');
+                      } finally {
+                        setIsForgotLoading(false);
+                      }
+                    }}
+                    disabled={isForgotLoading}
+                    className="w-full py-4 bg-black text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-black/10 mt-2 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                    {isForgotLoading ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send Verification Code'}
+                  </button>
+                </div>
+              )}
+
+              {forgotPasswordStep === 'otp' && (
+                <div className="space-y-5 text-left">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">OTP Code</label>
+                    <input 
+                      type="text" 
+                      value={forgotOTP} 
+                      onChange={e => setForgotOTP(e.target.value)} 
+                      placeholder="Enter 6-digit code"
+                      className="w-full text-center tracking-[0.5em] text-lg font-black border border-gray-100 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-black/5 focus:border-black outline-none bg-gray-50/50 focus:bg-white transition-all" 
+                    />
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      if (forgotOTP.length < 4) { Swal.fire('Error', 'Enter valid OTP', 'error'); return; }
+                      setForgotPasswordStep('reset');
+                    }}
+                    className="w-full py-4 bg-black text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-black/10 mt-2 active:scale-95 transition-all"
+                  >
+                    Verify Code
+                  </button>
+                  <button 
+                    onClick={() => setForgotPasswordStep('email')}
+                    className="w-full text-[9px] font-black uppercase text-gray-400 hover:text-black tracking-widest"
+                  >
+                    Wrong Email? Back
+                  </button>
+                </div>
+              )}
+
+              {forgotPasswordStep === 'reset' && (
+                <div className="space-y-5 text-left">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">New Password</label>
+                    <input 
+                      type="password" 
+                      value={newForgotPassword} 
+                      onChange={e => setNewForgotPassword(e.target.value)} 
+                      placeholder="Enter new password"
+                      className="w-full text-xs font-bold border border-gray-100 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-black/5 focus:border-black outline-none bg-gray-50/50 focus:bg-white transition-all" 
+                    />
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      if (newForgotPassword.length < 6) { Swal.fire('Error', 'Password must be at least 6 characters', 'error'); return; }
+                      setIsForgotLoading(true);
+                      try {
+                        const res = await fetch('/api/auth/reset-password', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: forgotEmail, otp: forgotOTP, newPassword: newForgotPassword })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          Swal.fire({
+                            title: 'Success!',
+                            text: 'পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে। নতুন পাসওয়ার্ড দিয়ে লগইন করুন।',
+                            icon: 'success',
+                            confirmButtonColor: '#000'
+                          });
+                          setIsForgotPasswordFlow(false);
+                          setForgotPasswordStep('email');
+                          setForgotEmail('');
+                          setForgotOTP('');
+                          setNewForgotPassword('');
+                        } else {
+                          Swal.fire('Error', data.error || 'Failed to reset password', 'error');
+                        }
+                      } catch (err) {
+                        Swal.fire('Error', 'Something went wrong', 'error');
+                      } finally {
+                        setIsForgotLoading(false);
+                      }
+                    }}
+                    disabled={isForgotLoading}
+                    className="w-full py-4 bg-black text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-black/10 mt-2 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                    {isForgotLoading ? <Loader2 className="animate-spin h-4 w-4" /> : 'Update & Login'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </motion.div>
       </div>
     );
   }
@@ -1536,12 +1577,14 @@ export default function AdminDashboard() {
       code: newProduct.code,
       images: additionalImages,
       serial: newProduct.serial,
-      stock: newProduct.stock,
+      stock: Object.keys(newProduct.sizeStocks || {}).length > 0 
+        ? Object.values(newProduct.sizeStocks).reduce((sum: number, s) => sum + (Number(s) || 0), 0)
+        : newProduct.stock,
       sizePrices: newProduct.sizePrices,
       sizeStocks: newProduct.sizeStocks
     });
     setIsAddingProduct(false);
-    setNewProduct({ name: '', price: 0, oldPrice: 0, image: '', description: '', isHotSale: false, isCollection: false, sizeChartImage: '', category: 'Basic', code: '', images: [''], serial: 0, stock: 50, sizePrices: {}, sizeStocks: {} });
+    setNewProduct({ name: '', price: 0, oldPrice: 0, image: '', description: '', isHotSale: false, isCollection: false, sizeChartImage: '', category: 'Basic', code: '', images: [''], serial: 0, stock: 0, sizePrices: {}, sizeStocks: {} });
     Swal.fire({
       title: 'Success!',
       text: 'Product has been added successfully with SweetAlert.',
@@ -1596,7 +1639,15 @@ export default function AdminDashboard() {
         }
       }
 
-      updateProduct(editingProduct);
+      // Calculate total stock from sizeStocks if sizes exist
+      const updatedProduct = {
+        ...editingProduct,
+        stock: Object.keys(editingProduct.sizeStocks || {}).length > 0
+          ? Object.values(editingProduct.sizeStocks).reduce((sum: number, s) => sum + (Number(s) || 0), 0)
+          : editingProduct.stock
+      };
+
+      updateProduct(updatedProduct);
       setEditingProduct(null);
       Swal.fire({
         title: 'Updated!',
@@ -1622,15 +1673,17 @@ export default function AdminDashboard() {
   };
 
   const exportOrdersToExcel = (filteredOrders: any[]) => {
-    const data = filteredOrders.flatMap(order => 
-      order.items.map((item: any) => ({
+    const data = filteredOrders.flatMap(order => {
+      const { actualShipping, actualTotalPayable } = getOrderTotals(order);
+
+      return order.items.map((item: any) => ({
         'Order ID': order.id,
         'Date': formatDate(order.date),
-        'Customer Name': order.customer.name,
-        'Phone': order.customer.phone,
-        'Email': order.customer.email,
-        'District': order.customer.district || 'N/A',
-        'Address': order.customer.address,
+        'Customer Name': order.customer?.name || 'N/A',
+        'Phone': order.customer?.phone || 'N/A',
+        'Email': order.customer?.email || 'N/A',
+        'District': order.customer?.district || 'N/A',
+        'Address': order.customer?.address || 'N/A',
         'Product Name': item.name,
         'Size': item.selectedSize || 'N/A',
         'Quantity': item.quantity,
@@ -1639,12 +1692,12 @@ export default function AdminDashboard() {
         'Coupon': order.couponCode || 'None',
         'Subtotal': order.subtotal,
         'Discount': order.discount,
-        'Shipping': order.total - order.subtotal + order.discount,
-        'Total Payable': order.total,
+        'Shipping': actualShipping,
+        'Total Payable': actualTotalPayable,
         'Order Status': order.status.toUpperCase(),
         'Payment Status': 'COD'
-      }))
-    );
+      }));
+    });
     
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -1654,7 +1707,7 @@ export default function AdminDashboard() {
     const max_width = data.reduce((w, r) => Math.max(w, Object.values(r).join('').length), 10);
     ws['!cols'] = Object.keys(data[0] || {}).map(() => ({ wch: 25 }));
     
-    XLSX.writeFile(wb, `TRENDIFY_Detailed_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `NEONTHREAD_Detailed_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleAddSlide = (e: React.FormEvent) => {
@@ -1818,15 +1871,22 @@ export default function AdminDashboard() {
   const orderToDisplay = isEditingOrder && editingOrderState ? editingOrderState : selectedOrderForView;
 
   return (
-    <div className="flex-1 w-full bg-gray-50 dark:bg-gray-950 flex flex-col md:flex-row min-h-screen transition-colors duration-300">
-      {/* Sidebar */}
+    <div className="flex-1 w-full bg-gray-50 dark:bg-gray-950 flex flex-col lg:flex-row min-h-screen transition-colors duration-300">
+      {/* Sidebar/Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div 
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
-            className="w-full md:w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col h-screen overflow-y-auto sticky top-0"
+            className="fixed lg:relative inset-y-0 left-0 z-50 w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 p-4 lg:p-6 flex flex-col h-full"
           >
             <div className="border-b dark:border-gray-800 pb-4 mb-4">
               <div className="flex flex-col items-center mb-10">
@@ -1865,7 +1925,7 @@ export default function AdminDashboard() {
               )}
             </div>
             
-            <nav className="space-y-1.5 flex-1 overflow-y-auto pr-1">
+            <nav className="space-y-1.5 flex-1 overflow-y-auto overflow-x-hidden pr-1">
               {/* Dashboard Button */}
               {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.dashboard) && (
                 <motion.button
@@ -1890,7 +1950,19 @@ export default function AdminDashboard() {
                 </motion.button>
               )}
     
-              {/* Categories Button */}
+              {/* Categories Banner Button */}
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.categoryBanners) && (
+                <motion.button
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => changeTab('categoriesBanner')}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'categoriesBanner' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <Layout className="h-4.5 w-4.5" /> Categories Banner
+                </motion.button>
+              )}
+    
+              {/* New Categories Button */}
               {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.categories) && (
                 <motion.button
                   whileHover={{ x: 4 }}
@@ -1898,7 +1970,7 @@ export default function AdminDashboard() {
                   onClick={() => changeTab('categories')}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'categories' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
-                  <Image className="h-4.5 w-4.5" /> Categories
+                  <TrendingUp className="h-4.5 w-4.5" /> Categories
                 </motion.button>
               )}
     
@@ -2036,22 +2108,10 @@ export default function AdminDashboard() {
                   onClick={() => changeTab('otps')}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'otps' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
-                  <Key className="h-4.5 w-4.5" /> OTP List 🔑
+                  <Key className="h-4.5 w-4.5" /> OTP List
                 </motion.button>
               )}
 
-              {/* Activity Log Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.activityLogs) && (
-                <motion.button
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => changeTab('activities')}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'activities' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                  <History className="h-4.5 w-4.5 text-black dark:text-white" /> Activity Log 📋
-                </motion.button>
-              )}
-    
               {/* Manage Admins Button (SUPER ADMIN ONLY) */}
               {currentAdmin?.role === 'super' && (
                 <motion.button
@@ -2060,7 +2120,7 @@ export default function AdminDashboard() {
                   onClick={() => changeTab('admins')}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'admins' ? 'bg-amber-600 text-white' : 'text-amber-700 bg-amber-50 hover:bg-amber-100'}`}
                 >
-                  <Users className="h-4.5 w-4.5 text-amber-600 animate-pulse" /> Manage Admins ⭐
+                  Manage Admins
                 </motion.button>
               )}
     
@@ -2279,7 +2339,7 @@ export default function AdminDashboard() {
                                       </p>
                                     </div>
                                     <div className="text-right">
-                                      <p className="text-xs font-black text-gray-900 dark:text-white">৳{order.total}</p>
+                                      <p className="text-xs font-black text-gray-900 dark:text-white">৳{getOrderTotals(order).actualTotalPayable}</p>
                                       <span className="text-[8px] font-black uppercase text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded mt-1 inline-block">Pending</span>
                                     </div>
                                   </div>
@@ -2423,9 +2483,9 @@ export default function AdminDashboard() {
               <img src="https://www.nottingham.ac.uk/Brand/LegacyAssets/images-multimedia/2022/Illustration/Scale500x500.jpg" alt="Welcome" className="w-full h-full object-contain" />
               </div>
               <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-black uppercase text-gray-900 tracking-tight">Welcome, {currentAdmin?.name.split('@')[0]}!</h1>
+                <h1 className="text-3xl font-black uppercase text-gray-900 tracking-tight">Welcome, {currentAdmin?.name?.split('@')[0]}!</h1>
                 <p className="mt-2 text-gray-500 font-medium max-w-xl">
-                  Welcome to your TRENDIFY administration dashboard. Here you can manage your shop products, track customer orders, update your lookbook styles, and manage your hero banners seamlessly. 
+                  Welcome to your NEONTHREAD administration dashboard. Here you can manage your shop products, track customer orders, update your lookbook styles, and manage your hero banners seamlessly. 
                 </p>
                 <div className="mt-6 flex flex-col gap-4">
                   <div className="flex flex-wrap gap-3 justify-center md:justify-start">
@@ -2434,7 +2494,7 @@ export default function AdminDashboard() {
                       <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">System Online</span>
                     </div>
                     <div className="px-4 py-2 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700">Role: {currentAdmin?.role} Admin</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700">Role: {currentAdmin?.role}</span>
                     </div>
 
                     {dbStatus?.connected ? (
@@ -2528,7 +2588,7 @@ export default function AdminDashboard() {
                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Order Status Distribution</h3>
                   <TrendingUp className="h-4 w-4 text-gray-400" />
                 </div>
-                <div className="h-[250px] w-full">
+                <div className="h-[250px] w-full min-h-[250px] min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={[
@@ -2603,7 +2663,7 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 </div>
-                <div className="h-[250px] w-full">
+                <div className="h-[250px] w-full min-h-[250px] min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={getFilteredOrdersForTrend()}
@@ -2640,7 +2700,7 @@ export default function AdminDashboard() {
                 <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Best Selling Products</h3>
                 <ShoppingBasket className="h-4 w-4 text-gray-400" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {bestSellingProducts.slice(0, 5).map((product, index) => (
                   <div key={product.id} className="bg-gray-50 p-4 rounded-2xl flex items-center gap-3 border border-gray-100 cursor-pointer hover:border-black transition-all" onClick={() => window.open(`/product/${product.id}`, '_blank')}>
                     <span className="text-xl font-black text-gray-300">#{index + 1}</span>
@@ -2654,19 +2714,19 @@ export default function AdminDashboard() {
               </div>
             </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div className="mt-6">
               {/* Category distribution chart */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm lg:col-span-2"
+                className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm"
               >
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-900">Product Categories Distribution</h3>
                   <Package className="h-4 w-4 text-gray-400" />
                 </div>
-                <div className="h-[300px] w-full">
+                <div className="h-[300px] w-full min-h-[300px] overflow-hidden">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -2676,11 +2736,12 @@ export default function AdminDashboard() {
                         }))}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
+                        innerRadius={50}
+                        outerRadius={80}
                         paddingAngle={5}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        labelLine={true}
                       >
                         {Array.from(new Set(products.map(p => p.category))).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 50%)`} />
@@ -2697,6 +2758,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* Reviews Tab Content */}
+        {activeTab === 'reviews' && <AdminReviewsView />}
 
         {/* Profile Tab Content */}
         {activeTab === 'profile' && currentAdmin && (
@@ -2715,15 +2779,40 @@ export default function AdminDashboard() {
                       <UserCircle className="w-16 h-16 text-gray-300" />
                     )}
                   </div>
-                  {/* <motion.div 
-                    whileHover={{ scale: 1.1 }}
-                    className="absolute bottom-0 right-0 p-2 bg-black text-white rounded-full cursor-pointer shadow-lg"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </motion.div> */}
+                  <label className="absolute bottom-0 right-0 p-2 bg-black text-white rounded-full cursor-pointer shadow-lg hover:scale-110 transition-transform">
+                    <Camera className="w-4 h-4" />
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            Swal.fire('Error', 'Image size should be less than 2MB', 'error');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onloadend = async () => {
+                            const base64 = reader.result as string;
+                            const res = await updateProfile({ image: base64 });
+                            if (res.success) {
+                              Swal.fire('Success', 'Profile image updated!', 'success');
+                            } else {
+                              Swal.fire('Error', res.error || 'Failed to update image', 'error');
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
                 <div className="flex-1 text-center md:text-left">
-                  <h2 className="text-2xl font-black text-gray-900">{currentAdmin.name || 'Admin User'}</h2>
+                  <div className="flex items-center justify-center md:justify-start gap-2">
+                    <h2 className="text-2xl font-black text-gray-900">{currentAdmin.name || 'Admin User'}</h2>
+                    {currentAdmin.role === 'super' && <ShieldAlert className="w-5 h-5 text-amber-500" />}
+                  </div>
                   <p className="text-gray-500 font-medium">{currentAdmin.email}</p>
                   <div className="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
                     <span className="px-3 py-1 bg-amber-50 text-amber-700 text-[10px] font-black uppercase rounded-full border border-amber-100">
@@ -2737,22 +2826,31 @@ export default function AdminDashboard() {
               </div>
 
               <form 
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
                   const formData = new FormData(e.currentTarget);
                   const name = formData.get('name') as string;
                   const email = formData.get('email') as string;
-                  const image = formData.get('image') as string;
                   const password = formData.get('password') as string;
+                  const confirmPassword = formData.get('confirm_password') as string;
 
-                  updateAdmin({
-                    ...currentAdmin,
-                    name,
-                    email,
-                    image,
-                    password: password || currentAdmin.password
-                  });
-                  Swal.fire('Updated!', 'Profile updated successfully.', 'success');
+                  if (password && password !== confirmPassword) {
+                    Swal.fire('Error', 'Passwords do not match', 'error');
+                    return;
+                  }
+
+                  const updates: any = { name, email };
+                  if (password) updates.password = password;
+
+                  setIsSavingProfile(true);
+                  const res = await updateProfile(updates);
+                  setIsSavingProfile(false);
+                  
+                  if (res.success) {
+                    Swal.fire('Updated!', 'Profile updated successfully.', 'success');
+                  } else {
+                    Swal.fire('Error', res.error || 'Update failed', 'error');
+                  }
                 }}
                 className="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
@@ -2765,21 +2863,23 @@ export default function AdminDashboard() {
                   <input name="email" defaultValue={currentAdmin.email} type="email" required className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-1 focus:ring-black focus:outline-none transition-all" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Profile Image URL</label>
-                  <input name="image" defaultValue={currentAdmin.image} placeholder="https://..." className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-1 focus:ring-black focus:outline-none transition-all" />
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">New Password (Leave blank to keep current)</label>
+                  <input name="password" type="password" placeholder="••••••••" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-1 focus:ring-black focus:outline-none transition-all" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">New Password (Leave blank to keep current)</label>
-                  <input name="password" type="password" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-1 focus:ring-black focus:outline-none transition-all" />
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm New Password</label>
+                  <input name="confirm_password" type="password" placeholder="••••••••" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-1 focus:ring-black focus:outline-none transition-all" />
                 </div>
                 <div className="md:col-span-2 pt-4">
                   <motion.button 
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
                     type="submit" 
-                    className="px-8 py-3 bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-black/10 transition-all hover:bg-gray-900"
+                    disabled={isSavingProfile}
+                    className="relative px-8 py-3 bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-black/10 transition-all hover:bg-gray-900 disabled:opacity-50 flex items-center justify-center w-full md:w-auto"
                   >
-                    Save Profile Changes
+                    <span className={isSavingProfile ? 'opacity-0' : 'opacity-100'}>Save Profile Changes</span>
+                    {isSavingProfile && <Loader2 className="animate-spin h-4 w-4 absolute" />}
                   </motion.button>
                 </div>
               </form>
@@ -2801,204 +2901,310 @@ export default function AdminDashboard() {
 
         {/* Product Management Modals (Shared for Shop and Collection) */}
         {isAddingProduct && (activeTab === 'shop' || activeTab === 'collection') && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-            <div className="bg-white p-8 md:p-12 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
-              <div className="w-full md:w-2/5 flex flex-col gap-4">
-                <div className="aspect-[4/5] rounded-2xl bg-gray-100 overflow-hidden border border-gray-200">
-                  {newProduct.image ? (
-                    <img src={newProduct.image} alt={newProduct.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <Image className="h-12 w-12 opacity-50" />
-                    </div>
-                  )}
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md py-4 px-4 sm:py-10 md:px-8">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl w-full max-w-6xl shadow-2xl relative flex flex-col max-h-[100vh] sm:max-h-[90vh] overflow-hidden border border-gray-100"
+            >
+              {/* Sticky Header */}
+              <div className="flex items-center justify-between px-6 py-6 pt-8 md:px-10 md:py-8 md:pt-10 border-b border-gray-100 bg-white/80 backdrop-blur-md z-10 sticky top-0">
+                <div className="flex items-center gap-4">
+                  <div className="bg-black text-white p-3 rounded-2xl shadow-lg shadow-black/10">
+                    <Plus className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-black uppercase text-xl md:text-2xl text-gray-900 tracking-tight">{newProduct.isCollection ? 'Add to Collection' : 'Add New Product'}</h3>
+                    <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Configure your product listings in detail</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Image Preview</span>
-                </div>
+                <button type="button" onClick={() => setIsAddingProduct(false)} className="text-gray-400 hover:text-black hover:bg-gray-100 p-3 rounded-xl transition-all bg-gray-50 hover:scale-105 active:scale-95">
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              <form onSubmit={handleAddProduct} className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
-                <div className="md:col-span-2 flex justify-between items-center mb-4 border-b border-gray-100 pb-4">
-                  <div>
-                    <h3 className="font-black uppercase text-xl text-gray-900">{newProduct.isCollection ? 'Add to Collection' : 'Add New Product'}</h3>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Fill in the details below</p>
-                  </div>
-                  <button type="button" onClick={() => setIsAddingProduct(false)} className="text-gray-400 hover:text-black hover:bg-gray-100 p-2 rounded-full transition-colors self-start -mt-2 -mr-2">
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Name</label><input required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.name} onChange={e=>setNewProduct({...newProduct, name: e.target.value})} /></div>
-                <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Original Price (৳)</label><input type="number" className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.oldPrice || 0} onChange={e=>setNewProduct({...newProduct, oldPrice: Number(e.target.value)})} placeholder="মেইন প্রাইস (ঐচ্ছিক)" /></div>
-                <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Selling Price (৳)</label><input type="number" required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.price} onChange={e=>setNewProduct({...newProduct, price: Number(e.target.value)})} /></div>
-                <div className="md:col-span-2 border border-dashed border-gray-200 rounded-2xl p-4 bg-gray-50/20">
-                  <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-900 mb-3">
-                    Size Specific Prices (সাইজ অনুযায়ী দাম - ঐচ্ছিক)
-                  </span>
-                  <div className="grid grid-cols-6 gap-2">
-                    {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map((sz) => (
-                      <div key={sz}>
-                        <label className="block text-[9px] font-bold uppercase text-gray-400 mb-1">{sz}</label>
-                        <input 
-                          type="number" 
-                          placeholder="Default price"
-                          className="w-full border border-gray-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black focus:outline-none bg-white transition-colors animate-none" 
-                          value={newProduct.sizePrices?.[sz] || ''} 
-                          onChange={e => setNewProduct({
-                            ...newProduct, 
-                            sizePrices: {
-                              ...newProduct.sizePrices,
-                              [sz]: e.target.value === '' ? 0 : Number(e.target.value)
-                            }
-                          })} 
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-1.5 font-bold">খালি রাখলে বা ০ দিলে মূল দামটি (Selling Price) প্রযোজ্য হবে।</p>
-                </div>
-                <div className="md:col-span-2 border border-dashed border-gray-200 rounded-2xl p-4 bg-gray-50/20">
-                  <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-900 mb-3">
-                    Size Specific Stock (সাইজ অনুযায়ী স্টক পরিমাণ - XXL, 3XL সহ)
-                  </span>
-                  <div className="grid grid-cols-6 gap-2">
-                    {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map((sz) => (
-                      <div key={sz}>
-                        <label className="block text-[9px] font-bold uppercase text-gray-400 mb-1">{sz}</label>
-                        <input 
-                          type="number" 
-                          placeholder="No size stock"
-                          className="w-full border border-gray-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-black focus:outline-none bg-white transition-colors animate-none" 
-                          value={newProduct.sizeStocks?.[sz] || ''} 
-                          onChange={e => {
-                            const val = e.target.value === '' ? 0 : Number(e.target.value);
-                            const updatedStocks = {
-                              ...(newProduct.sizeStocks || {}),
-                              [sz]: val
-                            };
-                            const totalStock = Object.values(updatedStocks).reduce((sum: number, curr: any) => sum + (Number(curr) || 0), 0);
-                            setNewProduct({
-                              ...newProduct, 
-                              sizeStocks: updatedStocks,
-                              stock: totalStock
-                            });
-                          }} 
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-1.5 font-bold">এখানে সাইজের আলাদা স্টক দিলে কাস্টমার সেই সাইজটি লিমিট অনুযায়ী কিনতে পারবে। খালি রাখলে গ্লোবাল স্টক (Stock Quantity) প্রযোজ্য হবে।</p>
-                </div>
-                <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Stock Quantity (calculated)</label><input type="number" readOnly disabled className="w-full border border-gray-200 rounded-xl p-3 text-sm bg-gray-100 text-gray-500 font-bold focus:outline-none cursor-not-allowed" value={newProduct.stock || 0} /></div>
-                <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Serial Number</label><input type="number" className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.serial} onChange={e=>setNewProduct({...newProduct, serial: Number(e.target.value)})} /></div>
-                <div className="md:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Main Image</label>
-                  <div className="flex gap-2">
-                    <input required className="flex-1 border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.image} onChange={e=>setNewProduct({...newProduct, image: e.target.value})} placeholder="URL or Base64" />
-                    <label className="cursor-pointer bg-black text-white px-4 rounded-xl flex items-center hover:bg-gray-800 transition-colors">
-                      <Camera className="h-4 w-4" />
-                      <input type="file" className="hidden" accept="image/*" onChange={e => handleImageUpload(e.target.files?.[0] || null, (url) => setNewProduct({...newProduct, image: url}))} />
-                    </label>
-                  </div>
-                </div>
-                <div className="md:col-span-2 border border-gray-100 p-4 rounded-2xl bg-gray-50/50">
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Product Images Collection (প্রোডাক্টের অন্যান্য ছবিসমূহ)</label>
-                  <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                    {(newProduct.images || []).map((imgUrl, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <input 
-                          type="text" 
-                          className="flex-1 border border-gray-200 rounded-xl p-2.5 text-xs focus:ring-1 focus:ring-black focus:outline-none bg-white transition-colors" 
-                          value={imgUrl} 
-                          onChange={e=>{
-                            const updated = [...newProduct.images];
-                            updated[idx] = e.target.value;
-                            setNewProduct({...newProduct, images: updated});
-                          }} 
-                          placeholder={`Image URL #${idx + 1}`} 
-                        />
-                        <label className="cursor-pointer bg-black text-white p-2.5 rounded-xl hover:bg-gray-800 transition-colors">
-                          <Camera className="h-3 w-3" />
-                          <input type="file" className="hidden" accept="image/*" onChange={e => handleImageUpload(e.target.files?.[0] || null, (url) => {
-                            const updated = [...newProduct.images];
-                            updated[idx] = url;
-                            setNewProduct({...newProduct, images: updated});
-                          })} />
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto w-full">
+                <form id="add-product-form" onSubmit={handleAddProduct} className="flex flex-col md:flex-row gap-8 p-6 md:p-10">
+                  
+                  {/* Left Column - Image & Visuals */}
+                  <div className="w-full md:w-[35%] flex flex-col gap-6">
+                    <div>
+                      <h4 className="font-black uppercase tracking-widest text-sm text-gray-900 mb-4 flex items-center gap-2">
+                        <Camera className="w-4 h-4 text-gray-400" /> Primary Media
+                      </h4>
+                      <div className="aspect-[4/5] rounded-3xl bg-gray-50 overflow-hidden border-2 border-dashed border-gray-200 relative group transition-all hover:border-black/30">
+                        {newProduct.image ? (
+                          <img src={newProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-3">
+                            <div className="p-4 bg-white rounded-full shadow-sm">
+                              <Image className="h-8 w-8 text-gray-300" />
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-widest">No Image Provided</span>
+                          </div>
+                        )}
+                        <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-sm">
+                          <span className="bg-white text-black px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
+                            <Camera className="w-4 h-4" /> Upload
+                          </span>
+                          <input type="file" className="hidden" accept="image/*" onChange={e => handleImageUpload(e.target.files?.[0] || null, (url) => setNewProduct({...newProduct, image: url}))} />
                         </label>
-                        <button 
-                          type="button" 
-                          onClick={()=>{
-                            const updated = newProduct.images.filter((_, i) => i !== idx);
-                            setNewProduct({...newProduct, images: updated});
-                          }} 
-                          className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-colors border border-transparent hover:border-red-100"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
                       </div>
-                    ))}
-                    {(newProduct.images || []).length === 0 && (
-                      <p className="text-xs text-gray-400 italic">No additional images added yet.</p>
-                    )}
+                      <div className="mt-4">
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Or Image URL</label>
+                        <input required className="w-full border border-gray-200 rounded-xl p-3.5 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors placeholder:text-gray-300" value={newProduct.image} onChange={e=>setNewProduct({...newProduct, image: e.target.value})} placeholder="https://..." />
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-900 mb-3">
+                        <Package className="w-4 h-4 text-gray-400" /> Gallery Images
+                      </label>
+                      <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                        {(newProduct.images || []).map((imgUrl, idx) => (
+                          <div key={idx} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-gray-100">
+                            <input 
+                              type="text" 
+                              className="flex-1 bg-transparent px-2 py-1 text-xs focus:outline-none" 
+                              value={imgUrl} 
+                              onChange={e=>{
+                                const updated = [...newProduct.images];
+                                updated[idx] = e.target.value;
+                                setNewProduct({...newProduct, images: updated});
+                              }} 
+                              placeholder={`Image URL #${idx + 1}`} 
+                            />
+                            <label className="cursor-pointer bg-gray-100 text-gray-600 p-2 rounded-lg hover:bg-black hover:text-white transition-colors">
+                              <Camera className="h-3 w-3" />
+                              <input type="file" className="hidden" accept="image/*" onChange={e => handleImageUpload(e.target.files?.[0] || null, (url) => {
+                                const updated = [...newProduct.images];
+                                updated[idx] = url;
+                                setNewProduct({...newProduct, images: updated});
+                              })} />
+                            </label>
+                            <button 
+                              type="button" 
+                              onClick={()=>{
+                                const updated = newProduct.images.filter((_, i) => i !== idx);
+                                setNewProduct({...newProduct, images: updated});
+                              }} 
+                              className="p-2 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        {(newProduct.images || []).length === 0 && (
+                          <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-xl">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">No gallery images</p>
+                          </div>
+                        )}
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={()=>{
+                          setNewProduct({...newProduct, images: [...(newProduct.images || []), '']});
+                        }} 
+                        className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-white border border-gray-200 hover:border-black hover:bg-black hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                      >
+                        <Plus className="h-3 w-3" /> Add Gallery Image
+                      </button>
+                    </div>
                   </div>
-                  <button 
-                    type="button" 
-                    onClick={()=>{
-                      setNewProduct({...newProduct, images: [...(newProduct.images || []), '']});
-                    }} 
-                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-black text-white hover:bg-gray-800 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors"
-                  >
-                    <Plus className="h-3 w-3" /> Add Image Field (প্লাস বাটন)
-                  </button>
-                </div>
-                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label><textarea required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors h-20 resize-none" value={newProduct.description} onChange={e=>setNewProduct({...newProduct, description: e.target.value})} /></div>
-                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Category</label><input required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.category} onChange={e=>setNewProduct({...newProduct, category: e.target.value})} placeholder="যেমন- Basic, Cotton, Sleeveless, Oversized, Winter" /></div>
-                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Product Code (Optional)</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.code || ''} onChange={e=>setNewProduct({...newProduct, code: e.target.value})} placeholder="যেমন- TY-1001 (ঐচ্ছিক)" /></div>
-                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Size Chart Image URL</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newProduct.sizeChartImage || ''} onChange={e=>setNewProduct({...newProduct, sizeChartImage: e.target.value})} placeholder="Optional size guide image URL (যেমন- https://...)" /></div>
-                <div className="md:col-span-2 flex items-center gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100 mb-2 font-bold uppercase tracking-widest text-xs">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="radio" 
-                      id="add-regular" 
-                      name="product-type"
-                      checked={!newProduct.isHotSale && !newProduct.isCollection} 
-                      onChange={() => setNewProduct({...newProduct, isHotSale: false, isCollection: false})} 
-                      className="w-4 h-4 text-black focus:ring-black"
-                    />
-                    <label htmlFor="add-regular" className="cursor-pointer">Regular</label>
+
+                  {/* Right Column - Product Details */}
+                  <div className="w-full md:w-[65%] flex flex-col gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Name */}
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Product Title</label>
+                        <input required className="w-full border-2 border-gray-100 rounded-2xl p-4 text-base font-bold focus:border-black focus:ring-0 focus:outline-none transition-colors placeholder:font-normal placeholder:text-gray-300 bg-gray-50 focus:bg-white" value={newProduct.name} onChange={e=>setNewProduct({...newProduct, name: e.target.value})} placeholder="e.g. Premium Cotton T-Shirt" />
+                      </div>
+
+                      <div className="md:col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Description</label><textarea required className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm focus:border-black focus:outline-none bg-gray-50 focus:bg-white transition-colors h-28 resize-none placeholder:text-gray-300 custom-scrollbar" value={newProduct.description} onChange={e=>setNewProduct({...newProduct, description: e.target.value})} placeholder="A highly detailed description of the product..." /></div>
+
+                      <div className="space-y-6">
+                        {/* Category */}
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Category</label>
+                          <select 
+                            required 
+                            className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm font-bold focus:border-black focus:outline-none bg-gray-50 focus:bg-white transition-colors appearance-none" 
+                            value={newProduct.category} 
+                            onChange={e => setNewProduct({...newProduct, category: e.target.value})}
+                          >
+                            <option value="">-- Select Category --</option>
+                            {categories.map(cat => (
+                              <option key={cat.id} value={cat.name}>{cat.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {/* Product Code */}
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">SKU / Product Code</label>
+                          <input className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm focus:border-black focus:outline-none bg-gray-50 focus:bg-white transition-colors placeholder:text-gray-300 font-mono font-bold" value={newProduct.code || ''} onChange={e=>setNewProduct({...newProduct, code: e.target.value})} placeholder="e.g. NT-1049" />
+                        </div>
+                        
+                        {/* Type Selection */}
+                        <div className="bg-gray-50 p-1.5 rounded-2xl border border-gray-100 flex shadow-inner">
+                          <label className={`flex-1 text-center py-2.5 rounded-xl cursor-pointer text-[10px] font-black uppercase tracking-widest transition-all ${!newProduct.isHotSale && !newProduct.isCollection ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-700'}`}>
+                            <input type="radio" name="product-type" className="hidden" checked={!newProduct.isHotSale && !newProduct.isCollection} onChange={() => setNewProduct({...newProduct, isHotSale: false, isCollection: false})} />
+                            Regular
+                          </label>
+                          <label className={`flex-1 text-center py-2.5 rounded-xl cursor-pointer text-[10px] font-black uppercase tracking-widest transition-all ${newProduct.isHotSale ? 'bg-black shadow-sm text-white' : 'text-gray-400 hover:text-gray-700'}`}>
+                            <input type="radio" name="product-type" className="hidden" checked={newProduct.isHotSale} onChange={() => setNewProduct({...newProduct, isHotSale: true, isCollection: false})} />
+                            Hot Sale
+                          </label>
+                          <label className={`flex-1 text-center py-2.5 rounded-xl cursor-pointer text-[10px] font-black uppercase tracking-widest transition-all ${newProduct.isCollection ? 'bg-[#98875b] shadow-sm text-white' : 'text-gray-400 hover:text-gray-700'}`}>
+                            <input type="radio" name="product-type" className="hidden" checked={newProduct.isCollection} onChange={() => setNewProduct({...newProduct, isCollection: true, isHotSale: false})} />
+                            Collection
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        {/* Pricing Block */}
+                        <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Tag className="w-4 h-4 text-gray-400" />
+                            <h5 className="text-[10px] font-black uppercase tracking-widest text-gray-900">Pricing Details</h5>
+                          </div>
+                          <div className="space-y-4">
+                            <div className="relative">
+                              <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Selling Price (৳) *</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
+                                <input type="number" required className="w-full border border-gray-200 rounded-xl p-3 pl-8 text-black font-black focus:ring-1 focus:ring-black focus:outline-none bg-white transition-colors" value={newProduct.price || ''} onChange={e=>setNewProduct({...newProduct, price: Number(e.target.value)})} placeholder="0.00" />
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Original Price (Strike-through)</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
+                                <input type="number" className="w-full border border-gray-200 rounded-xl p-3 pl-8 text-gray-500 font-bold focus:ring-1 focus:ring-black focus:outline-none bg-white transition-colors" value={newProduct.oldPrice || ''} onChange={e=>setNewProduct({...newProduct, oldPrice: Number(e.target.value)})} placeholder="Optional" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Global Stock */}
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1 flex justify-between">
+                            <span>Global Stock</span>
+                            <span className="text-gray-300 lowercase font-normal italic">*auto-calc if size stocks provided</span>
+                          </label>
+                          <input type="number" readOnly className="w-full border-2 border-gray-100 rounded-2xl p-4 text-lg font-black bg-gray-50 text-gray-500 focus:outline-none cursor-not-allowed" value={newProduct.stock || 0} />
+                        </div>
+                      </div>
+                      
+                      {/* Size Matrix */}
+                      <div className="md:col-span-2">
+                        <div className="border border-gray-200 rounded-3xl overflow-hidden bg-white shadow-sm">
+                          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-gray-400" />
+                            <h5 className="text-[10px] font-black uppercase tracking-widest text-gray-900">Size Variations Matrix</h5>
+                            <span className="ml-auto text-[10px] font-bold text-gray-400 bg-white px-2 py-1 rounded-md border border-gray-200">OPTIONAL</span>
+                          </div>
+                          
+                          <div className="p-6">
+                            <p className="text-[10px] text-gray-500 mb-6 font-medium leading-relaxed max-w-xl">
+                              Define different prices or stock limitations per size. If a size price is left empty, the <strong className="text-black">Selling Price</strong> will be applied. If size stocks are left empty, they share the <strong className="text-black">Global Stock</strong> pool.
+                            </p>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                              {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map((sz) => (
+                                <div key={sz} className="flex flex-col gap-2 p-3 rounded-2xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors hover:border-gray-300">
+                                  <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-black self-center shadow-md shadow-black/10">
+                                    {sz}
+                                  </div>
+                                  
+                                  <div className="mt-2 space-y-2">
+                                    <div>
+                                      <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest ml-1">Price (৳)</label>
+                                      <input 
+                                        type="number" 
+                                        placeholder="Def."
+                                        className="w-full border-none rounded-xl p-2 text-xs font-bold text-center focus:ring-2 focus:ring-black focus:outline-none bg-white shadow-sm mt-0.5 placeholder:text-gray-300" 
+                                        value={newProduct.sizePrices?.[sz] || ''} 
+                                        onChange={e => setNewProduct({
+                                          ...newProduct, 
+                                          sizePrices: {
+                                            ...newProduct.sizePrices,
+                                            [sz]: e.target.value === '' ? 0 : Number(e.target.value)
+                                          }
+                                        })} 
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest ml-1">Qty</label>
+                                      <input 
+                                        type="number" 
+                                        placeholder="∞"
+                                        className="w-full border-none rounded-xl p-2 text-xs font-bold text-center focus:ring-2 focus:ring-black focus:outline-none bg-white shadow-sm mt-0.5 placeholder:text-gray-300" 
+                                        value={newProduct.sizeStocks?.[sz] || ''} 
+                                        onChange={e => {
+                                          const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                          const updatedStocks = {
+                                            ...(newProduct.sizeStocks || {}),
+                                            [sz]: val
+                                          };
+                                          const totalStock = Object.values(updatedStocks).reduce((sum: number, curr: any) => sum + (Number(curr) || 0), 0);
+                                          setNewProduct({
+                                            ...newProduct, 
+                                            sizeStocks: updatedStocks,
+                                            stock: totalStock
+                                          });
+                                        }} 
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Size Chart Image */}
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Size Chart Matrix Image</label>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="relative flex-1">
+                            <input className="w-full border-2 border-gray-100 rounded-2xl p-4 pr-12 text-sm focus:border-black focus:outline-none bg-gray-50 focus:bg-white transition-colors placeholder:text-gray-300" value={newProduct.sizeChartImage || ''} onChange={e=>setNewProduct({...newProduct, sizeChartImage: e.target.value})} placeholder="https://..." />
+                            <Ruler className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5 pointer-events-none" />
+                          </div>
+                          <label className="cursor-pointer bg-gray-100 hover:bg-black text-black hover:text-white transition-colors px-6 py-4 rounded-2xl flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-[10px] whitespace-nowrap">
+                            <Camera className="w-4 h-4" /> Upload Image
+                            <input type="file" className="hidden" accept="image/*" onChange={e => handleImageUpload(e.target.files?.[0] || null, (url) => setNewProduct({...newProduct, sizeChartImage: url}))} />
+                          </label>
+                        </div>
+                        {newProduct.sizeChartImage && (
+                          <div className="mt-4 rounded-2xl border-2 border-gray-100 overflow-hidden bg-white relative group inline-block">
+                             <img src={newProduct.sizeChartImage} alt="Size Chart" className="h-32 object-contain p-2" />
+                             <button type="button" onClick={() => setNewProduct({...newProduct, sizeChartImage: ''})} className="absolute top-2 right-2 p-1.5 bg-red-50 hover:bg-red-500 hover:text-white rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-all border border-red-100">
+                               <X className="w-3.5 h-3.5" />
+                             </button>
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="radio" 
-                      id="add-hotsale" 
-                      name="product-type"
-                      checked={newProduct.isHotSale} 
-                      onChange={() => setNewProduct({...newProduct, isHotSale: true, isCollection: false})} 
-                      className="w-4 h-4 text-black focus:ring-black"
-                    />
-                    <label htmlFor="add-hotsale" className="cursor-pointer">Hot Sale</label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="radio" 
-                      id="add-collection" 
-                      name="product-type"
-                      checked={newProduct.isCollection} 
-                      onChange={() => {
-                        const col = true;
-                        setNewProduct({...newProduct, isCollection: col, isHotSale: false});
-                      }} 
-                      className="w-4 h-4 text-black focus:ring-black"
-                    />
-                    <label htmlFor="add-collection" className="cursor-pointer">Our Collection</label>
-                  </div>
-                </div>
-                <div className="md:col-span-2 flex gap-3 justify-end pt-2 mt-6 mb-6">
-                  <button type="button" onClick={() => setIsAddingProduct(false)} className="px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-100 transition-colors text-gray-600">Cancel</button>
-                  <button type="submit" className="bg-black text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs shadow-xl shadow-black/10 active:scale-95 transition-transform">Save Product</button>
-                </div>
-              </form>
-            </div>
+                </form>
+              </div>
+
+              {/* Sticky Footer Actions */}
+              <div className="px-6 py-5 md:px-10 border-t border-gray-100 bg-gray-50/80 backdrop-blur-md flex justify-end gap-4 z-10">
+                <button type="button" onClick={() => setIsAddingProduct(false)} className="px-8 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-colors text-gray-600 active:scale-95">Discard</button>
+                <button form="add-product-form" type="submit" className="bg-black text-white px-10 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-black/20 hover:shadow-black/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all flex items-center gap-2">
+                  <Check className="w-4 h-4" /> Save Product
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
 
@@ -3157,7 +3363,20 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label><textarea required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors h-20 resize-none" value={editingProduct.description} onChange={e=>setEditingProduct({...editingProduct, description: e.target.value})} /></div>
-                <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Category</label><input required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.category || ''} onChange={e=>setEditingProduct({...editingProduct, category: e.target.value})} placeholder="যেমন- Basic, Cotton, Sleeveless, Oversized, Winter" /></div>
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Category (ক্যাটাগরি)</label>
+                  <select 
+                    required 
+                    className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" 
+                    value={editingProduct.category || ''} 
+                    onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}
+                  >
+                    <option value="">-- Select Category --</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Product Code</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.code || ''} onChange={e=>setEditingProduct({...editingProduct, code: e.target.value})} placeholder="যেমন- TY-1001" /></div>
                 <div className="md:col-span-2"><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Size Chart Image URL</label><input className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.sizeChartImage || ''} onChange={e=>setEditingProduct({...editingProduct, sizeChartImage: e.target.value})} placeholder="Optional size guide image URL (যেমন- https://...)" /></div>
                 <div className="md:col-span-2 flex items-center gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100 mb-2 font-bold uppercase tracking-widest text-xs">
@@ -3810,7 +4029,7 @@ export default function AdminDashboard() {
                                   </div>
                                 </td>
                                 <td className="py-4 px-4">
-                                  <span className="font-black text-gray-900 dark:text-white text-sm">৳{order.total.toLocaleString()}</span>
+                                  <span className="font-black text-gray-900 dark:text-white text-sm">৳{getOrderTotals(order).actualTotalPayable.toLocaleString()}</span>
                                 </td>
                                 <td className="py-4 px-4 font-bold">
                                   <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border inline-block ${
@@ -4284,12 +4503,12 @@ export default function AdminDashboard() {
                                   </div>
                                   <div className="flex justify-between text-sm">
                                     <span className="text-gray-500 font-medium">Shipping Charge</span>
-                                    <span className="font-bold">৳{(orderToDisplay ? (orderToDisplay.total - (orderToDisplay.subtotal - orderToDisplay.discount)) : 0).toFixed(2)}</span>
+                                    <span className="font-bold">৳{(orderToDisplay ? getOrderTotals(orderToDisplay).actualShipping : 0).toFixed(2)}</span>
                                   </div>
                                   <div className="h-px bg-gray-200 my-2" />
                                   <div className="flex justify-between items-center text-lg">
                                     <span className="font-black uppercase tracking-tighter">Total</span>
-                                    <span className="font-black text-blue-600">৳{orderToDisplay?.total.toFixed(2)}</span>
+                                    <span className="font-black text-blue-600">৳{(orderToDisplay ? getOrderTotals(orderToDisplay).actualTotalPayable : 0).toFixed(2)}</span>
                                   </div>
                                 </div>
                               </section>
@@ -4497,6 +4716,15 @@ export default function AdminDashboard() {
                               <button 
                                 onClick={() => {
                                   if (selectedOrderForView) {
+                                    if (currentAdmin?.role !== 'super') {
+                                        Swal.fire({
+                                            title: 'Error',
+                                            text: 'Only Super Admin can delete orders.',
+                                            icon: 'error',
+                                            confirmButtonColor: '#000000'
+                                        });
+                                        return;
+                                    }
                                     if (selectedOrderForView.status === 'delivered') {
                                         Swal.fire({
                                             title: 'Error',
@@ -4523,7 +4751,7 @@ export default function AdminDashboard() {
                                     });
                                   }
                                 }}
-                                className="w-full bg-red-50 text-red-600 p-5 rounded-3xl flex flex-col items-center justify-center gap-2 hover:bg-red-100 transition-all border border-red-100 shadow-xl shadow-red-600/5 group cursor-pointer"
+                                className={`w-full bg-red-50 text-red-600 p-5 rounded-3xl flex flex-col items-center justify-center gap-2 transition-all border border-red-100 shadow-xl shadow-red-600/5 group ${currentAdmin?.role !== 'super' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-100 cursor-pointer'}`}
                               >
                                 <Trash2 className="w-6 h-6 group-hover:scale-110 transition-transform" />
                                 <span className="text-[10px] font-black uppercase tracking-widest">Delete Order</span>
@@ -4710,9 +4938,9 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Reviews Tab */}
-        {activeTab === 'reviews' && (
-          <AdminReviewsView />
+        {/* New Categories Management Tab */}
+        {activeTab === 'categories' && (
+          <AdminCategoriesView />
         )}
 
         {/* Slides Tab */}
@@ -4855,8 +5083,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Categories Tab */}
-        {activeTab === 'categories' && (
+        {/* Categories Banner Tab (Old Categories) */}
+        {activeTab === 'categoriesBanner' && (
           <div>
             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
               <h1 className="text-2xl font-black uppercase">Category Banners</h1>
@@ -4864,7 +5092,7 @@ export default function AdminDashboard() {
                 onClick={() => setIsAddingCategoryBanner(!isAddingCategoryBanner)}
                 className="bg-black text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 tracking-widest text-[10px] font-bold uppercase transition-colors"
                >
-                {isAddingCategoryBanner ? 'Cancel' : <><Plus className="h-4 w-4"/> Add Category</>}
+                {isAddingCategoryBanner ? 'Cancel' : <><Plus className="h-4 w-4"/> Add Category Banner</>}
               </button>
             </div>
 
@@ -5750,8 +5978,25 @@ export default function AdminDashboard() {
         {activeTab === 'policies' && (
           <div>
             <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-              <h1 className="text-2xl font-black uppercase">Policies</h1>
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Update Support Content & Legal Disclosures</span>
+              <div>
+                <h1 className="text-2xl font-black uppercase">Policies</h1>
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Update Support Content & Legal Disclosures</span>
+              </div>
+              {(!policies?.some(p => p.key === 'shipping_returns') || !policies?.some(p => p.key === 'privacy_policy')) && (
+                <motion.button 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setEditingPolicy(null);
+                    const hasShipping = policies?.some(p => p.key === 'shipping_returns');
+                    setNewPolicy({ key: hasShipping ? 'privacy_policy' : 'shipping_returns', title: '', content: '' });
+                    setIsAddingPolicy(true);
+                  }} 
+                  className="bg-black text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-black/10 transition-all hover:shadow-black/20"
+                >
+                  <Plus className="h-4 w-4" /> Add Policy
+                </motion.button>
+              )}
             </div>
 
             {isAddingPolicy && (
@@ -5771,9 +6016,8 @@ export default function AdminDashboard() {
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Policy ID Key</label>
                         <select required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={newPolicy.key} onChange={e=>setNewPolicy({...newPolicy, key: e.target.value})}>
-                          <option key="shipping_returns" value="shipping_returns">Shipping & Returns</option>
-                          <option key="privacy_policy" value="privacy_policy">Privacy Policy</option>
-                          <option key="custom" value="custom">Other Custom Policy</option>
+                          {!policies?.some(p => p.key === 'shipping_returns') && <option key="shipping_returns" value="shipping_returns">Shipping & Returns</option>}
+                          {!policies?.some(p => p.key === 'privacy_policy') && <option key="privacy_policy" value="privacy_policy">Privacy Policy</option>}
                         </select>
                       </div>
                     )}
@@ -5796,7 +6040,7 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {policies?.map(policy => (
-                <div key={policy.key} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                <div key={policy.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <span className="p-1 px-2 text-[8px] font-bold uppercase tracking-widest bg-black text-white rounded">{policy.key}</span>
@@ -5815,29 +6059,31 @@ export default function AdminDashboard() {
                     >
                       <Edit className="h-4 w-4"/> Edit Content
                     </button>
-                    {policy.key !== 'shipping_returns' && policy.key !== 'privacy_policy' && (
-                      <button 
-                        onClick={() => {
-                          Swal.fire({
-                            title: 'Are you sure?',
-                            text: 'This will delete this policy content permanently!',
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonColor: '#d33',
-                            cancelButtonColor: '#3085d6',
-                            confirmButtonText: 'Yes, delete it!'
-                          }).then((result) => {
-                            if (result.isConfirmed) {
-                              deletePolicy(policy.key);
-                              Swal.fire('Deleted!', 'Policy has been deleted.', 'success');
-                            }
-                          });
-                        }}
-                        className="text-red-500 hover:bg-red-50 p-2 rounded-lg"
-                      >
-                        <Trash2 className="h-4 w-4"/>
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => {
+                        let willDeleteFixed = false;
+                        if (policy.key === 'shipping_returns' || policy.key === 'privacy_policy') {
+                          willDeleteFixed = true;
+                        }
+                        Swal.fire({
+                          title: 'Are you sure?',
+                          text: willDeleteFixed ? 'This will delete a system policy content permanently!' : 'This will delete this policy content permanently!',
+                          icon: 'warning',
+                          showCancelButton: true,
+                          confirmButtonColor: '#d33',
+                          cancelButtonColor: '#3085d6',
+                          confirmButtonText: 'Yes, delete it!'
+                        }).then((result) => {
+                          if (result.isConfirmed) {
+                            deletePolicy(policy.id);
+                            Swal.fire('Deleted!', 'Policy has been deleted.', 'success');
+                          }
+                        });
+                      }}
+                      className="text-red-500 hover:bg-red-50 p-2 rounded-lg"
+                    >
+                      <Trash2 className="h-4 w-4"/>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -5848,11 +6094,6 @@ export default function AdminDashboard() {
         {/* OTP List Tab */}
         {activeTab === 'otps' && (currentAdmin?.role === 'super' || currentAdmin?.permissions?.otps) && (
           <AdminOTPView />
-        )}
-
-        {/* Activity Log Tab */}
-        {activeTab === 'activities' && (currentAdmin?.role === 'super' || currentAdmin?.permissions?.activityLogs) && (
-          <AdminActivityLogsView />
         )}
 
         {/* Admins Tab (SUPER ADMIN ONLY) */}
@@ -5874,6 +6115,7 @@ export default function AdminDashboard() {
                     orders: true,
                     coupons: true,
                     slides: true,
+                    categoryBanners: true,
                     categories: true,
                     lookbook: true,
                     subscribers: true,
@@ -5882,9 +6124,8 @@ export default function AdminDashboard() {
                     faqs: true,
                     policies: true,
                     reviews: true,
-                    otps: false,
-                    otpsDelete: false,
-                    activityLogs: false,
+                    otps: true,
+                    otpsDelete: true,
                     notifications: true
                   });
                   setIsAddingAdmin(true);
@@ -5920,19 +6161,25 @@ export default function AdminDashboard() {
                         return;
                       }
                       
-                      if (!newAdminPassword) {
+                      if (!editingAdmin && !newAdminPassword) {
                         Swal.fire('Error', 'অনুগ্রহ করে পাসওয়ার্ড প্রদান করুন', 'error');
                         return;
                       }
 
                       if (editingAdmin) {
                         // edit
-                        updateAdmin({
+                        const adminUpdates: any = {
                           ...editingAdmin,
                           email: newAdminEmail.trim().toLowerCase(),
-                          password: newAdminPassword,
                           permissions: newAdminPermissions
-                        });
+                        };
+                        if (newAdminPassword) {
+                          adminUpdates.password = newAdminPassword;
+                        } else {
+                          // Ensure we don't accidentally send an empty string password
+                          delete adminUpdates.password;
+                        }
+                        updateAdmin(adminUpdates);
                         Swal.fire('সফল হয়েছে!', 'এডমিন একাউন্ট আপডেট করা হয়েছে', 'success');
                       } else {
                         // duplicate check
@@ -5968,12 +6215,14 @@ export default function AdminDashboard() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Password</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                          Password {editingAdmin && '(Leave blank to keep current)'}
+                        </label>
                         <input 
-                          type="text" 
-                          required 
-                          placeholder="Min 6 characters"
-                          className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors font-mono" 
+                          type="password" 
+                          required={!editingAdmin}
+                          placeholder={editingAdmin ? "••••••••" : "Min 6 characters"}
+                          className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" 
                           value={newAdminPassword} 
                           onChange={e=>setNewAdminPassword(e.target.value)} 
                         />
@@ -6040,6 +6289,19 @@ export default function AdminDashboard() {
                           />
                           <div>
                             <span className="text-xs font-black uppercase text-gray-800 block">Categories</span>
+                          </div>
+                        </label>
+
+                        {/* categoryBanners permissions */}
+                        <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 hover:border-black cursor-pointer transition-all select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={newAdminPermissions.categoryBanners} 
+                            onChange={e => setNewAdminPermissions({...newAdminPermissions, categoryBanners: e.target.checked})}
+                            className="rounded border-gray-300 text-black focus:ring-black h-4.5 w-4.5 cursor-pointer"
+                          />
+                          <div>
+                            <span className="text-xs font-black uppercase text-gray-800 block">Category Banners</span>
                           </div>
                         </label>
 
@@ -6160,19 +6422,6 @@ export default function AdminDashboard() {
                           </div>
                         </label>
 
-                        {/* activityLogs permissions */}
-                        <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 hover:border-black cursor-pointer transition-all select-none">
-                          <input 
-                            type="checkbox" 
-                            checked={newAdminPermissions.activityLogs || false} 
-                            onChange={e => setNewAdminPermissions({...newAdminPermissions, activityLogs: e.target.checked})}
-                            className="rounded border-gray-300 text-black focus:ring-black h-4.5 w-4.5 cursor-pointer"
-                          />
-                          <div>
-                            <span className="text-xs font-black uppercase text-gray-800 block">Activity Logs</span>
-                          </div>
-                        </label>
-
                         {/* reviews permissions */}
                         <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-xl border border-gray-200 hover:border-black cursor-pointer transition-all select-none">
                           <input 
@@ -6238,8 +6487,8 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td className="py-4 px-6">
-                            <span className="font-mono text-xs text-gray-600 select-all bg-gray-100 px-2 py-1 rounded">
-                              {admin.password || '••••••••'}
+                            <span className="font-mono text-xs text-gray-400 select-none bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                              ••••••••
                             </span>
                           </td>
                           <td className="py-4 px-6">
@@ -6278,7 +6527,6 @@ export default function AdminDashboard() {
                                     faqs: 'FAQs',
                                     policies: 'Policies',
                                     otps: 'OTP Secrets Tracker',
-                                    activityLogs: 'Activity Logs',
                                     reviews: 'Manage Reviews'
                                   };
                                   
@@ -6300,7 +6548,7 @@ export default function AdminDashboard() {
                                   onClick={() => {
                                     setEditingAdmin(admin);
                                     setNewAdminEmail(admin.email);
-                                    setNewAdminPassword(admin.password || '');
+                                    setNewAdminPassword(''); // Don't show password
                                     setNewAdminPermissions({ dashboard: false, ...admin.permissions });
                                     setIsAddingAdmin(true);
                                   }}

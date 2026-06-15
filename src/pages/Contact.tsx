@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2 } from 'lucide-react';
 import { useShop } from '../ShopContext';
 import Swal from 'sweetalert2';
 
 export default function Contact() {
   const { addContactMessage } = useShop();
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+  const [isSending, setIsSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name && formData.email && formData.message) {
+      setIsSending(true);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       addContactMessage(formData);
+      setIsSending(false);
       setFormData({ name: '', email: '', message: '' });
       Swal.fire('Success', "Thanks for your message! We'll be in touch soon.", 'success');
     }
@@ -21,7 +26,7 @@ export default function Contact() {
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-4 uppercase">Contact Us</h1>
           <p className="text-gray-500 font-medium">
-            Have a question about our t-shirts, sizing, or an existing order? We'd love to hear from you.
+            Have a question about our products, sizing, or an existing order? We'd love to hear from you.
           </p>
         </div>
 
@@ -42,8 +47,8 @@ export default function Contact() {
                   <label className="block text-[10px] font-bold uppercase text-gray-400">Message</label>
                   <textarea rows={5} required value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:bg-white focus:ring-1 focus:ring-black focus:outline-none resize-none"></textarea>
                 </div>
-                <button type="submit" className="w-full py-4 bg-black text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-xl shadow-black/10 mt-6 active:scale-95 transition-transform">
-                  Send Message
+                <button type="submit" disabled={isSending} className="w-full py-4 bg-black text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-xl shadow-black/10 mt-6 active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-50">
+                  {isSending ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send Message'}
                 </button>
               </form>
             </div>

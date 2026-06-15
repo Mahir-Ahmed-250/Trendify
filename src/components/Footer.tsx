@@ -8,10 +8,10 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
             <Link to="/" className="flex items-center text-2xl font-black tracking-tighter text-white mb-4">
-              Trendify<span className="text-gray-500">.</span>
+              NeonThread<span className="text-gray-500">.</span>
             </Link>
             <p className="text-gray-400 max-w-sm">
-              Your ultimate destination for premium quality, stylish t-shirts. Wear your vibe.
+              Your ultimate destination for premium quality, stylish products. Wear your vibe.
             </p>
           </div>
           <div>
@@ -32,7 +32,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="border-t border-gray-800 mt-12 pt-8 text-sm text-center text-gray-500">
-          <p>© {new Date().getFullYear()} Trendify. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} NeonThread. All rights reserved.</p>
         </div>
       </div>
     </footer>

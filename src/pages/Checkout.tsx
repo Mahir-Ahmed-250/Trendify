@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ticket, Plus, Minus, Trash2, Loader2 } from 'lucide-react';
 import { useShop } from '../ShopContext';
-import Swal from 'sweetalert2';
+import { useToast } from '../components/Toast';
 import { motion } from 'motion/react';
 import SuccessAnimation from '../components/SuccessAnimation';
 
@@ -74,7 +74,8 @@ const BANGLADESH_DISTRICTS = [
 ];
 
 export default function Checkout() {
-  const { cart, coupons, placeOrder, clearCart, updateCartQuantity, removeFromCart, updateCartItemSize } = useShop();
+  const { cart, products, coupons, placeOrder, clearCart, updateCartQuantity, removeFromCart, updateCartItemSize } = useShop();
+  const { addToast } = useToast();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -89,6 +90,12 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState('');
   const [orderComplete, setOrderComplete] = useState<{status: boolean, id?: string}>({status: false});
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  useEffect(() => {
+    if (cart.length === 0 && !orderComplete.status) {
+      navigate('/shop');
+    }
+  }, [cart.length, navigate, orderComplete.status]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discountAmount = activeCoupon 
@@ -125,12 +132,6 @@ export default function Checkout() {
     );
   }
 
-  useEffect(() => {
-    if (cart.length === 0 && !orderComplete.status) {
-      navigate('/shop');
-    }
-  }, [cart.length, navigate, orderComplete.status]);
-
   if (cart.length === 0 && !orderComplete.status) {
     return null;
   }
@@ -146,7 +147,7 @@ export default function Checkout() {
       const isActive = c.isActive;
       const isNotExpired = !c.expiryDate || new Date(c.expiryDate) >= now;
       const isStarted = !c.startDate || new Date(c.startDate) <= now;
-      return c.code === couponCodeInput.trim() && isActive && isNotExpired && isStarted;
+      return c.code.toLowerCase() === couponCodeInput.trim().toLowerCase() && isActive && isNotExpired && isStarted;
     });
     
     if (found) {
@@ -159,14 +160,8 @@ export default function Checkout() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    Swal.fire({
-      title: 'প্রসেসিং...',
-      text: 'আপনার অর্ডারটি প্রসেস করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন।',
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      }
-    });
+    setIsSendingEmail(true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // small delay for UI to register loader
 
     const customerDetails = {
       name: formData.name,
@@ -179,47 +174,35 @@ export default function Checkout() {
     const result = placeOrder(customerDetails, activeCoupon?.code);
 
     if (result.success) {
-      // Build order details object for email invoice
+      addToast('Order placed successfully!', 'success');
+      setOrderComplete({status: true, id: result.orderId});
+
+      // Send invoice in the background
       const newOrderObj = {
         id: result.orderId,
         customer: customerDetails,
         items: [...cart],
         subtotal,
         discount: discountAmount,
+        shippingCharge,
         total,
         couponCode: activeCoupon?.code,
         date: new Date().toISOString(),
         status: 'pending'
       };
 
-      try {
-        await fetch('/api/send-invoice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email, order: newOrderObj })
-        });
-      } catch (err) {
-        console.error('Failed to send invoice email:', err);
-      } finally {
-        Swal.close();
-        setIsSendingEmail(false);
-      }
-
-      setOrderComplete({status: true, id: result.orderId});
-      Swal.fire({
-        title: 'অর্ডার সফল হয়েছে!',
-        text: `আপনার অর্ডার সফলভাবে গ্রহণ করা হয়েছে। অর্ডার আইডি: ${result.orderId}। ইনভয়েসটি দেওয়া ইমেইলে পাঠিয়ে দেওয়া হয়েছে।`,
-        icon: 'success',
-        confirmButtonColor: '#000'
+      fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, order: newOrderObj })
+      }).catch(err => {
+        console.error('Failed to send invoice email in background:', err);
       });
-    } else {
+      
       setIsSendingEmail(false);
-      Swal.fire({
-        title: 'Error',
-        text: result.error,
-        icon: 'error',
-        confirmButtonColor: '#000'
-      });
+    } else {
+
+      addToast(result.error || 'অর্ডার করতে সমস্যা হয়েছে।', 'error');
     }
   };
 
@@ -350,10 +333,19 @@ export default function Checkout() {
                           <div className="relative inline-block">
                             <select
                               value={item.selectedSize || 'M'}
-                              onChange={(e) => updateCartItemSize(item.id, item.selectedSize || 'M', e.target.value)}
+                              onChange={(e) => {
+                                updateCartItemSize(item.id, item.selectedSize || 'M', e.target.value);
+                                updateCartQuantity(item.id, 1, e.target.value);
+                              }}
                               className="text-[9px] font-black uppercase text-gray-550 dark:text-gray-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded px-1 py-0.5 leading-none focus:outline-none focus:border-black dark:focus:border-white cursor-pointer"
                             >
-                              {['S', 'M', 'L', 'XL', 'XXL', '3XL'].map(sz => (
+                              {['S', 'M', 'L', 'XL', 'XXL', '3XL']
+                                .filter(sz => {
+                                  const product = products.find(p => p.id === item.id);
+                                  const stock = product ? (product.sizeStocks ? product.sizeStocks[sz] : product.stock) : 0;
+                                  return (stock || 0) > 0;
+                                })
+                                .map(sz => (
                                 <option key={sz} value={sz} className="bg-white dark:bg-gray-900 text-gray-950 dark:text-gray-100">
                                   Size: {sz}
                                 </option>
@@ -375,17 +367,9 @@ export default function Checkout() {
                           <button
                             type="button"
                             onClick={() => {
-                              const stock = item.stock || 0;
+                              const stock = (products.find(p => p.id === item.id)?.sizeStocks?.[item.selectedSize || 'M'] ?? item.stock ?? 0);
                               if (item.quantity >= stock) {
-                                Swal.fire({
-                                  title: 'স্টকে নাই',
-                                  text: `দুঃখিত, এই প্রোডাক্টটি সর্বোচ্চ ${stock} টি স্টকে আছে।`,
-                                  icon: 'warning',
-                                  timer: 2000,
-                                  showConfirmButton: false,
-                                  toast: true,
-                                  position: 'top-end'
-                                });
+                                addToast(`দুঃখিত, এই প্রোডাক্টটি সর্বোচ্চ ${stock} টি স্টকে আছে।`, 'error');
                               } else {
                                 updateCartQuantity(item.id, item.quantity + 1, item.selectedSize);
                               }
@@ -462,10 +446,19 @@ export default function Checkout() {
             <button
               type="submit"
               form="checkout-form"
-              className="w-full py-4 bg-black dark:bg-white dark:text-black text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-xl shadow-black/10 dark:shadow-white/5 mt-6 active:scale-95 transition-transform"
+              disabled={isSendingEmail}
+              className="w-full py-4 bg-black dark:bg-white dark:text-black text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-xl shadow-black/10 dark:shadow-white/5 mt-6 active:scale-95 transition-transform flex items-center justify-center gap-2"
             >
-              Place Order Now
+              {isSendingEmail ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Place Order Now'
+              )}
             </button>
+
           </div>
         </div>
       </div>

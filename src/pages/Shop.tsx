@@ -7,7 +7,7 @@ import { SlidersHorizontal, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function Shop() {
-  const { products } = useShop();
+  const { products, categories } = useShop();
   const shopProducts = useMemo(() => products, [products]);
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
@@ -27,11 +27,10 @@ export default function Shop() {
   const [sortBy, setSortBy] = useState('none');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Dynamically obtain unique categories
+  // Use managed categories from context
   const categoriesList = useMemo(() => {
-    const cats = shopProducts.map(p => p.category ? p.category.trim() : 'General');
-    return Array.from(new Set(cats)).filter(Boolean);
-  }, [shopProducts]);
+    return categories.map(c => c.name);
+  }, [categories]);
 
   const filteredProducts = useMemo(() => {
     let result = shopProducts;
@@ -41,6 +40,7 @@ export default function Shop() {
       result = result.filter(
         p => p.name.toLowerCase().includes(lowerQuery) || 
              p.description.toLowerCase().includes(lowerQuery) ||
+             (p.category && p.category.toLowerCase().includes(lowerQuery)) ||
              (p.code && p.code.toLowerCase().includes(lowerQuery))
       );
     }
