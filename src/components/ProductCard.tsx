@@ -1,17 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ShoppingCart, Heart, Star, Check, ArrowLeftRight } from 'lucide-react';
+import { ShoppingCart, Heart, Star, Check, ArrowLeftRight, Eye } from 'lucide-react';
 import { Product } from '../types';
 import { useShop } from '../ShopContext';
 import { useToast } from './Toast';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import QuickViewModal from './QuickViewModal';
 
 export default function ProductCard({ product }: { product: Product, key?: React.Key }) {
   const { addToCart, wishlist, toggleWishlist, reviews, cart, comparisonItems, toggleComparison } = useShop();
   const { addToast } = useToast();
   const [isAdded, setIsAdded] = useState(false);
   const [showSizeModal, setShowSizeModal] = useState(false);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
 
   const isOutOfStock = (product.stock || 0) <= 0;
   const isWishlisted = wishlist.includes(product.id);
@@ -90,6 +92,18 @@ export default function ProductCard({ product }: { product: Product, key?: React
           aria-label={isComparing ? "Remove from comparison" : "Add to comparison"}
         >
           <ArrowLeftRight size={14} />
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsQuickViewOpen(true);
+          }}
+          className="absolute top-[84px] right-2 p-2 bg-white/80 dark:bg-black/80 text-gray-900 dark:text-white rounded-full shadow-lg z-10 transition-all transform active:scale-95 hover:bg-white dark:hover:bg-black group/eye"
+          aria-label="Quick View"
+        >
+          <Eye size={14} className="group-hover/eye:scale-110 transition-transform" />
         </button>
       </Link>
       <Link to={`/product/${product.id}`} className="flex justify-between items-start block mb-3 gap-2">
@@ -217,6 +231,12 @@ export default function ProductCard({ product }: { product: Product, key?: React
           {isOutOfStock ? 'Sold Out' : 'Buy Now'}
         </Link>
       </div>
+
+      <QuickViewModal 
+        product={product} 
+        isOpen={isQuickViewOpen} 
+        onClose={() => setIsQuickViewOpen(false)} 
+      />
     </motion.div>
   );
 }

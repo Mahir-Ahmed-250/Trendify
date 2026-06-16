@@ -432,27 +432,38 @@ export default function ProductDetails() {
             </div>
 
             {/* Quantity Selector */}
-            <div className="mb-8">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-900 mb-3">Quantity (পরিমাণ)</h3>
-              <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50 w-fit">
-                <button
-                  type="button"
-                  onClick={handleDecrease}
-                  className="p-3 text-gray-500 hover:text-black focus:outline-none transition-colors"
-                  disabled={quantity <= 1}
+            <AnimatePresence mode="wait">
+              {!isOutOfStock && (
+                <motion.div 
+                  key="quantity-selector"
+                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginBottom: '2rem' }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  className="overflow-hidden"
                 >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <span className="w-12 text-center font-black text-sm text-gray-900">{quantity}</span>
-                <button
-                  type="button"
-                  onClick={handleIncrease}
-                  className="p-3 text-gray-500 hover:text-black focus:outline-none transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-900 mb-3">Quantity (পরিমাণ)</h3>
+                  <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50 w-fit">
+                    <button
+                      type="button"
+                      onClick={handleDecrease}
+                      className="p-3 text-gray-500 hover:text-black focus:outline-none transition-colors"
+                      disabled={quantity <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-12 text-center font-black text-sm text-gray-900">{quantity}</span>
+                    <button
+                      type="button"
+                      onClick={handleIncrease}
+                      className="p-3 text-gray-500 hover:text-black focus:outline-none transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Add to Cart and Buy Now Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
