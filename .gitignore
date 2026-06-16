@@ -6,4 +6,4 @@ coverage/
 *.log
 .env*
 .env.example*
-.vite.config.ts
+vite.config.ts
