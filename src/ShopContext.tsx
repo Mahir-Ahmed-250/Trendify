@@ -162,7 +162,7 @@ const DatabaseLoader = () => {
 
   useEffect(() => {
     const start = Date.now();
-    const duration = 2000;
+    const duration = 500;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - start;
@@ -339,11 +339,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDbLoaded, setIsDbLoaded] = useState(false);
 
   const serverSave = async (key: string, data: any) => {
+    if (!authToken) return;
     try {
       const res = await fetch('/api/db/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, data, token: authToken || '' })
+        body: JSON.stringify({ key, data, token: authToken })
       });
       
       if (!res.ok) {
@@ -790,7 +791,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }
 
-    const newOrderId = `TND-${Date.now()}${(Math.random() * 1000).toFixed(0)}`;
+    const newOrderId = `NTD-${Date.now()}${(Math.random() * 1000).toFixed(0)}`;
 
     const newOrder: Order = {
       id: newOrderId,

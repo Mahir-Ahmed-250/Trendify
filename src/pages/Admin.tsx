@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Lottie from 'lottie-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, PieChart, Pie, Legend } from 'recharts';
 import { useShop } from '../ShopContext';
@@ -506,12 +505,27 @@ function AdminReviewsView() {
 }
 
 const getOrderTotals = (order: any) => {
-  const defaultShipping = order.customer?.district === 'Dhaka' ? 70 : 120;
-  const actualShipping = order.shippingCharge !== undefined ? order.shippingCharge : defaultShipping;
+  // Extract and normalize shipping charge
+  let actualShipping = 120; // Default fallback
   
-  const expectedOldTotal = order.subtotal - order.discount;
-  const isShippingMissing = Math.abs(order.total - expectedOldTotal) < 0.01;
-  const actualTotalPayable = isShippingMissing ? order.total + actualShipping : order.total;
+  // Try to determine the shipping charge based on order.shippingCharge
+  if (order.shippingCharge !== undefined && order.shippingCharge !== null) {
+    const parsed = Number(order.shippingCharge);
+    if (!isNaN(parsed)) {
+      actualShipping = parsed;
+    }
+  } else {
+    // Determine default shipping based on district
+    const districtStr = (order.customer?.district || '').trim().toLowerCase();
+    const addressStr = (order.customer?.address || '').trim().toLowerCase();
+    const isDhaka = districtStr.includes('dhaka') || addressStr.includes('dhaka');
+    actualShipping = isDhaka ? 70 : 120;
+  }
+  
+  // Calculate actual total payable securely
+  const subtotal = Number(order.subtotal) || 0;
+  const discount = Number(order.discount) || 0;
+  const actualTotalPayable = subtotal - discount + actualShipping;
   
   return { actualShipping, actualTotalPayable };
 };

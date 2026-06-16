@@ -679,7 +679,7 @@ export default function ProductDetails() {
                           type="text" 
                           value={reviewOrderLine}
                           onChange={(e) => setReviewOrderLine(e.target.value)}
-                          placeholder="Ex: TND-168545..."
+                          placeholder="Ex: NTD-168545..."
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-sm font-black tracking-widest focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all focus:bg-white uppercase placeholder:normal-case placeholder:font-bold"
                         />
                         <p className="text-[9px] text-gray-400 font-bold uppercase ml-1 italic leading-tight">Must match the exact order ID provided in your invoice.</p>

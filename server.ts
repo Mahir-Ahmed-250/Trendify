@@ -86,7 +86,7 @@ async function getMongoDb(): Promise<Db | null> {
     try {
       console.log("Connecting to MongoDB...");
       mongoClient = new MongoClient(cleanUri, {
-        serverSelectionTimeoutMS: 15000 // 5 seconds timeout before fallback so app doesn't hang
+        serverSelectionTimeoutMS: 3000 // 3 seconds timeout before fallback so app doesn't hang
       });
       await mongoClient.connect();
       mongoDb = mongoClient.db("neonthread_db");

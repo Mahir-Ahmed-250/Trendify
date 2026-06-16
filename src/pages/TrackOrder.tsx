@@ -183,7 +183,7 @@ export default function TrackOrder() {
                       <input
                         type="text"
                         required
-                        placeholder="Enter Order ID (TND-XXXXXXXXXXXXXXXX)"
+                        placeholder="Enter Order ID (NTD-XXXXXXXXXXXXXXXX)"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         className="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-2xl py-5 pl-14 pr-4 focus:ring-2 focus:ring-slate-900 dark:focus:ring-white focus:outline-none transition-all dark:text-white font-mono uppercase font-bold"
