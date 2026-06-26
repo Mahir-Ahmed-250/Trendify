@@ -1,7 +1,16 @@
 {
-"rewrites": [
+  "version": 2,
+  "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/:path*",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/product/:id",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api|product).*)*",
       "destination": "/index.html"
     }
   ]

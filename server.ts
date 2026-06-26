@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import fs from "fs/promises";
@@ -311,10 +310,25 @@ function getTransporter() {
   return transporter;
 }
 
-async function startServer() {
-  console.log("startServer function called...");
-  const app = express();
-  const PORT = 3000;
+const app = express();
+
+let viteInstance: any = null;
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+  console.log("Initializing Vite dev server asynchronously...");
+  import("vite").then(({ createServer }) => {
+    createServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    }).then((v) => {
+      viteInstance = v;
+      console.log("Vite dev server initialized.");
+    }).catch((err) => {
+      console.error("Failed to initialize Vite:", err);
+    });
+  }).catch((err) => {
+    console.error("Failed to dynamically import Vite package:", err);
+  });
+}
 
   // API routes FIRST - even before middleware for debugging
   app.get("/api/health", (req, res) => {
@@ -383,20 +397,7 @@ async function startServer() {
 
   console.log("Middleware configured, starting Vite if needed...");
 
-  // Vite middleware for development
-  let vite: any;
-  if (process.env.NODE_ENV !== "production") {
-    console.log("Initializing Vite dev server...");
-    try {
-      vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: "spa",
-      });
-      console.log("Vite dev server initialized.");
-    } catch (err) {
-      console.error("Failed to initialize Vite:", err);
-    }
-  }
+  // Vite middleware is handled asynchronously at the end of routing
 
   // Health check was moved to top, but let's keep the others here or after basic middleware
   // app.get("/api/health" ...) was moved to top
@@ -409,7 +410,7 @@ async function startServer() {
       
       if (!product) return next();
 
-      let htmlFile = (process.env.NODE_ENV === "production" || !vite)
+      let htmlFile = (process.env.NODE_ENV === "production" || !viteInstance)
         ? path.join(process.cwd(), "dist", "index.html")
         : path.join(process.cwd(), "index.html");
 
@@ -450,8 +451,8 @@ async function startServer() {
         html = html.replace("<head>", `<head>${ogTags}`);
       }
 
-      if (vite) {
-        html = await vite.transformIndexHtml(req.originalUrl, html);
+      if (viteInstance) {
+        html = await viteInstance.transformIndexHtml(req.originalUrl, html);
       }
 
       res.status(200).set({ "Content-Type": "text/html" }).send(html);
@@ -1009,20 +1010,42 @@ const PUBLIC_WRITABLE_KEYS = ["orders", "subscribers", "contactMessages", "revie
   });
 
   // Vite middleware for development
-  if (vite) {
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    // Notice how we use '*' for Express v4 to serve SPA!
-    app.get("*", (req, res) => {
+  app.use((req, res, next) => {
+    if (viteInstance) {
+      viteInstance.middlewares(req, res, next);
+    } else if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+      const checkVite = setInterval(() => {
+        if (viteInstance) {
+          clearInterval(checkVite);
+          viteInstance.middlewares(req, res, next);
+        }
+      }, 50);
+    } else {
+      next();
+    }
+  });
+
+  const distPath = path.join(process.cwd(), "dist");
+  app.use(express.static(distPath));
+  
+  app.get("*", (req, res, next) => {
+    if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+      if (viteInstance) {
+        viteInstance.middlewares(req, res, next);
+      } else {
+        res.send("Loading Vite dev server...");
+      }
+    } else {
       res.sendFile(path.join(distPath, "index.html"));
+    }
+  });
+
+  if (!process.env.VERCEL) {
+    const PORT = Number(process.env.PORT) || 3000;
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
-
-startServer();
+export { app };
+export default app;
