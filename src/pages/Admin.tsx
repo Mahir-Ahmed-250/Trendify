@@ -3671,12 +3671,12 @@ export default function AdminDashboard() {
 
         {/* Product Management Modals (Shared for Shop and Collection) */}
         {isAddingProduct && (activeTab === 'shop' || activeTab === 'collection') && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md py-4 px-4 sm:py-10 md:px-8">
+          <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-md p-4 pt-16 md:pt-20 pb-6">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl w-full max-w-6xl shadow-2xl relative flex flex-col max-h-[100vh] sm:max-h-[90vh] overflow-hidden border border-gray-100"
+              className="bg-white rounded-3xl w-full max-w-6xl shadow-2xl relative flex flex-col max-h-[100vh] sm:max-h-[82vh] overflow-hidden border border-gray-100"
             >
               {/* Sticky Header */}
               <div className="flex items-center justify-between px-6 py-6 pt-8 md:px-10 md:py-8 md:pt-10 border-b border-gray-100 bg-white/80 backdrop-blur-md z-10 sticky top-0">
@@ -3986,8 +3986,8 @@ export default function AdminDashboard() {
         )}
 
         {editingProduct && (activeTab === 'shop' || activeTab === 'collection') && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-            <div className="bg-white p-8 md:p-12 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+            <div className="bg-white p-8 md:p-12 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
               
               {/* Image Preview */}
               <div className="w-full md:w-2/5 flex flex-col gap-4">
@@ -4873,13 +4873,13 @@ export default function AdminDashboard() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-md flex items-center justify-center md:p-8"
+                    className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-start justify-center p-4 md:p-8 pt-16 md:pt-20 pb-6"
                   >
                     <motion.div 
                       initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0.9, opacity: 0 }}
-                      className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl md:rounded-[3rem] shadow-2xl relative overflow-hidden flex flex-col"
+                      className="bg-white w-full h-full md:h-auto md:max-h-[82vh] md:max-w-6xl md:rounded-[3rem] shadow-2xl relative overflow-hidden flex flex-col"
                     >
                       {/* Header */}
                       <div className="bg-gray-900 p-6 md:p-8 text-white flex justify-between items-center">
@@ -5564,8 +5564,8 @@ export default function AdminDashboard() {
             </div>
 
             {isAddingCoupon && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative">
+              <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative max-h-[82vh] overflow-y-auto">
                   <form onSubmit={handleAddCoupon} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2 flex justify-between items-center mb-4 border-b border-gray-100 pb-4">
                       <div>
@@ -5735,8 +5735,8 @@ export default function AdminDashboard() {
             </div>
 
             {isAddingSlide && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
                   <div className="w-full md:w-2/5 flex flex-col gap-4">
                     <div className="aspect-[4/5] rounded-2xl bg-gray-100 overflow-hidden border border-gray-200">
                       {newSlide.image ? (
@@ -5875,8 +5875,8 @@ export default function AdminDashboard() {
             </div>
 
             {isAddingCategoryBanner && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
                   <div className="w-full md:w-2/5 flex flex-col gap-4">
                     <div className="aspect-[4/5] rounded-2xl bg-gray-100 overflow-hidden border border-gray-200">
                       {newCategoryBanner.image ? (
@@ -5948,8 +5948,8 @@ export default function AdminDashboard() {
             )}
 
             {editingCategoryBanner && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
                   <div className="w-full md:w-2/5 flex flex-col gap-4">
                     <div className="aspect-[4/5] rounded-2xl bg-gray-100 overflow-hidden border border-gray-200">
                       {editingCategoryBanner.image ? (
@@ -6077,8 +6077,8 @@ export default function AdminDashboard() {
             </div>
 
             {isAddingLookbook && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
                   <div className="w-full md:w-2/5 flex flex-col gap-4">
                     <div className="aspect-[4/5] rounded-2xl bg-gray-100 overflow-hidden border border-gray-200 shadow-inner">
                       {newLookbook.image ? (
@@ -6413,8 +6413,8 @@ export default function AdminDashboard() {
                 </div>
 
                 {isAddingHomeAd && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                    <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+                  <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                    <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
                       <div className="w-full md:w-2/5 flex flex-col gap-4">
                         <div className="aspect-[16/9] rounded-2xl bg-gray-100 overflow-hidden border border-gray-200">
                           {newHomeAd.imageUrl ? (
@@ -6571,8 +6571,8 @@ export default function AdminDashboard() {
                 </div>
 
                 {isAddingPopupAd && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                    <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+                  <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                    <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
                       <div className="w-full md:w-2/5 flex flex-col gap-4">
                         <div className="aspect-[4/5] rounded-2xl bg-gray-100 overflow-hidden border border-gray-200">
                           {newPopupAd.imageUrl ? (
@@ -6691,8 +6691,8 @@ export default function AdminDashboard() {
             </div>
 
             {isAddingFAQ && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[82vh] overflow-y-auto">
                   <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-4">
                     <div>
                       <h3 className="font-black uppercase text-xl text-gray-900">{editingFAQ ? 'Edit FAQ' : 'Add New FAQ'}</h3>
@@ -6791,8 +6791,8 @@ export default function AdminDashboard() {
             </div>
 
             {isAddingPolicy && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-3xl shadow-2xl relative flex flex-col max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-3xl shadow-2xl relative flex flex-col max-h-[82vh] overflow-y-auto">
                   <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-4">
                     <div>
                       <h3 className="font-black uppercase text-xl text-gray-900">{editingPolicy ? 'Edit Policy' : 'Create New Policy'}</h3>
@@ -6929,8 +6929,8 @@ export default function AdminDashboard() {
 
             {/* Admin Add / Edit Modal Overlay */}
             {isAddingAdmin && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6 animate-fadeIn">
+                <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative flex flex-col max-h-[82vh] overflow-y-auto">
                   <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-4">
                 <div className="flex items-center gap-3">
                   <h3 className="font-black uppercase text-xl text-gray-900">
@@ -7385,8 +7385,8 @@ export default function AdminDashboard() {
         </AnimatePresence>
 
         {isSendingEmail && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm py-10 px-4">
-            <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-[150] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
+            <div className="bg-white p-6 md:p-8 rounded-3xl w-full max-w-4xl shadow-2xl relative flex flex-col md:flex-row gap-8 max-h-[82vh] overflow-y-auto">
               
               <div className="w-full md:w-2/5 flex flex-col gap-4">
                 <div className="aspect-[4/5] rounded-2xl bg-gray-50 border border-gray-200 overflow-hidden flex flex-col p-4">

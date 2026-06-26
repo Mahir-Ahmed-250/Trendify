@@ -197,7 +197,7 @@ export default function ProductCard({ product }: { product: Product, key?: React
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => setShowSizeModal(false)}>
+                className="fixed inset-0 bg-black/50 z-[180] flex items-start justify-center p-4 pt-16 md:pt-20 pb-6" onClick={() => setShowSizeModal(false)}>
                 <motion.div
                   initial={{ scale: 0.9 }}
                   animate={{ scale: 1 }}

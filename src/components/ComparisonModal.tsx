@@ -30,7 +30,7 @@ export default function ComparisonModal({ isOpen, onClose }: { isOpen: boolean, 
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="fixed inset-0 z-[150] flex items-start justify-center p-4 sm:p-6 lg:p-8 pt-16 md:pt-20 pb-6">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -43,7 +43,7 @@ export default function ComparisonModal({ isOpen, onClose }: { isOpen: boolean, 
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative bg-white dark:bg-gray-900 w-full max-w-6xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+          className="relative bg-white dark:bg-gray-900 w-full max-w-6xl max-h-[82vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col"
         >
           {/* Header */}
           <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 sticky top-0 z-10">

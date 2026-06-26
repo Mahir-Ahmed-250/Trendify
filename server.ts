@@ -937,12 +937,10 @@ const PUBLIC_WRITABLE_KEYS = ["orders", "subscribers", "contactMessages", "revie
       };
 
       const mailer = getTransporter();
-      // Send email in background to prevent slow SMTP from delaying the response
-      mailer.sendMail(mailOptions).catch((err: any) => {
-        console.error("Nodemailer background invoice sending error:", err);
-      });
+      // Await email sending to guarantee success in serverless/Vercel environments before response is closed
+      await mailer.sendMail(mailOptions);
       
-      res.status(200).json({ success: true, message: "Invoice email queued for sending in the background" });
+      res.status(200).json({ success: true, message: "Invoice email sent successfully" });
     } catch (err: any) {
       console.error("Nodemailer invoice error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });
@@ -997,12 +995,10 @@ const PUBLIC_WRITABLE_KEYS = ["orders", "subscribers", "contactMessages", "revie
       };
 
       const mailer = getTransporter();
-      // Send email in background to prevent slow SMTP from delaying the response
-      mailer.sendMail(mailOptions).catch((err: any) => {
-        console.error("Nodemailer background OTP sending error:", err);
-      });
+      // Await email sending to guarantee success in serverless/Vercel environments before response is closed
+      await mailer.sendMail(mailOptions);
       
-      res.status(200).json({ success: true, message: "OTP email queued for sending in the background" });
+      res.status(200).json({ success: true, message: "OTP email sent successfully" });
     } catch (err: any) {
       console.error("Nodemailer OTP sending error:", err);
       res.status(500).json({ error: err.message || "Internal server error" });

@@ -55,7 +55,7 @@ export default function PopupAdOverlay() {
   if (!activeAd) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[180] flex items-start justify-center bg-black/60 backdrop-blur-sm p-4 pt-16 md:pt-20 pb-6">
       <div className="relative max-w-lg w-full bg-white rounded-2xl overflow-hidden shadow-2xl transition-all">
         <button onClick={handleClose} className="absolute top-4 right-4 z-10 bg-black/50 text-white rounded-full p-2 hover:bg-black transition-colors">
           <X className="h-5 w-5" />

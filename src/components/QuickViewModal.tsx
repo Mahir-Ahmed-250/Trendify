@@ -57,7 +57,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
   const modalContent = (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[99999] flex items-start justify-center p-4 pt-16 md:pt-20 pb-6">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -74,7 +74,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen, onClos
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-gray-900 rounded-3xl overflow-hidden max-w-4xl w-full max-h-[90vh] shadow-2xl relative flex flex-col md:flex-row z-10"
+            className="bg-white dark:bg-gray-900 rounded-3xl overflow-hidden max-w-4xl w-full max-h-[82vh] shadow-2xl relative flex flex-col md:flex-row z-10"
           >
             {/* Close Button */}
             <button

@@ -20,7 +20,6 @@ export const generateInvoicePDF = (order: Order) => {
   doc.setFontSize(10);
   doc.text(`Order ID: ${order.id}`, 14, 45);
   doc.text(`Date: ${new Date(order.date).toLocaleDateString()}`, 14, 50);
-  doc.text(`Status: ${order.status.toUpperCase()}`, 14, 55);
 
   // Customer Info
   doc.setFontSize(12);

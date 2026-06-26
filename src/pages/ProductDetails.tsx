@@ -760,7 +760,7 @@ export default function ProductDetails() {
       {/* Pop-up Size Guide Modal */}
       <AnimatePresence>
         {isSizeModalOpen && (
-          <div className="fixed inset-0 z-[250] flex items-center justify-center px-4">
+          <div className="fixed inset-0 z-[250] flex items-start justify-center px-4 pt-16 md:pt-20 pb-6">
             {/* Backdrop with motion fade */}
             <motion.div
               initial={{ opacity: 0 }}

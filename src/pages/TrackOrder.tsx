@@ -374,7 +374,7 @@ export default function TrackOrder() {
         {/* Improved Detailed Modal for Track Order */}
         <AnimatePresence>
           {selectedOrder && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[180] flex items-start justify-center p-4 pt-16 md:pt-20 pb-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -386,9 +386,9 @@ export default function TrackOrder() {
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="relative bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-[2.5rem] shadow-2xl border border-white/20"
+                className="relative bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[82vh] overflow-hidden rounded-[2.5rem] shadow-2xl border border-white/20"
               >
-                <div className="p-6 md:p-10 overflow-y-auto max-h-[90vh] custom-scrollbar">
+                <div className="p-6 md:p-10 overflow-y-auto max-h-[82vh] custom-scrollbar">
                   <div className="flex justify-between items-start mb-8">
                     <div>
                       <h2 className="text-2xl font-black uppercase text-slate-900 dark:text-white tracking-tighter">Order <span className="text-blue-600">Details</span></h2>
