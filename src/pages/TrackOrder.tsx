@@ -5,6 +5,20 @@ import { Order } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import Swal from 'sweetalert2';
 
+declare module 'react/jsx-runtime' {
+  export function jsx(type: any, props?: any, key?: string | number): any;
+  export function jsxs(type: any, props?: any, key?: string | number): any;
+  export function jsxDEV(type: any, props?: any, key?: string | number, isStaticChildren?: boolean, source?: any, self?: any): any;
+}
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      [elemName: string]: any;
+    }
+  }
+}
+
 export default function TrackOrder() {
   const { orders, otps, addOTP } = useShop();
   const [searchBy, setSearchBy] = useState<'id' | 'phone'>('id');
@@ -309,7 +323,7 @@ export default function TrackOrder() {
                           <div className="bg-slate-50 dark:bg-slate-700 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold mb-1 w-fit">Order ID</div>
                           <h4 className="font-mono font-bold text-slate-900 dark:text-white uppercase truncate max-w-[120px]">{order.id}</h4>
                         </div>
-                        <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold border ${
+                        <span className={`capitalize px-3 py-1.5 rounded-full text-[10px] font-bold border  ${
                           order.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                           order.status === 'processing' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                           order.status === 'shipped' ? 'bg-purple-50 text-purple-600 border-purple-100' :
