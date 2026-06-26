@@ -35,12 +35,24 @@ export default function PopupAdOverlay() {
     }
   }, [location.pathname, popupAds]);
 
-  if (!activeAd) return null;
-
   const handleClose = () => {
-    sessionStorage.setItem(`ad_shown_${activeAd.id}_${location.pathname}`, 'true');
-    setActiveAd(null);
+    if (activeAd) {
+      sessionStorage.setItem(`ad_shown_${activeAd.id}_${location.pathname}`, 'true');
+      setActiveAd(null);
+    }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && activeAd) {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeAd, location.pathname]);
+
+  if (!activeAd) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

@@ -243,7 +243,7 @@ export default function TrackOrder() {
                 {/* Information assist block */}
                 <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-2xl">
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center leading-relaxed">
-                    আপনার মেইল ইনবক্স চেক করুন (প্রয়োজনে Spam ফোল্ডারটিও দেখতে পারেন)। যদি কোনো কারণে মেইল না পান, তবে এডমিন প্যানেলের <strong>OTP List 🔑</strong> থেকে কোডটি সংগ্রহ করতে পারবেন।
+                    আপনার মেইল ইনবক্স চেক করুন (প্রয়োজনে Spam ফোল্ডারটিও দেখতে পারেন)। যদি কোনো কারণে মেইল না পান, তবে এডমিন প্যানেলের <strong>OTP</strong> থেকে কোডটি সংগ্রহ করতে পারবেন।
                   </p>
                 </div>
 

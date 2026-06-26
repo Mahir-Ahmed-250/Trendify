@@ -16,8 +16,11 @@ import PopupAdOverlay from './components/PopupAdOverlay';
 import ScrollToTop from './components/ScrollToTop';
 import CartSidebar from './components/CartSidebar';
 import CompareButton from './components/CompareButton';
+import AnnouncementBar from './components/AnnouncementBar';
+import PageLoader from './components/PageLoader';
 
 import FloatingButtons from './components/FloatingButtons';
+import { useShop } from './ShopContext';
 
 const Home = lazy(() => import('./pages/Home'));
 const Shop = lazy(() => import('./pages/Shop'));
@@ -36,7 +39,10 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 function RootLayout() {
   return (
     <div className="flex flex-col min-h-screen bg-white transition-colors duration-300">
-      <Navbar />
+      <header className="sticky top-0 z-[100]">
+        <AnnouncementBar />
+        <Navbar />
+      </header>
       <Breadcrumbs />
       <CartSidebar />
       <CompareButton />
@@ -51,6 +57,19 @@ function RootLayout() {
 
 function AnimatedRoutes() {
   const location = useLocation();
+  const { isMaintenanceMode } = useShop();
+
+  if (isMaintenanceMode && !location.pathname.startsWith('/admin')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white text-center px-4">
+        <h1 className="text-4xl font-black uppercase tracking-tight mb-4 text-black">Under Maintenance</h1>
+        <p className="text-gray-500 font-medium max-w-md mx-auto">
+          We are currently updating our website to serve you better. Please check back soon!
+        </p>
+      </div>
+    );
+  }
+
   return (
     <Suspense fallback={<div className="flex-1" />}>
       <AnimatePresence mode="wait">
@@ -70,7 +89,7 @@ function AnimatedRoutes() {
               <Route path="wishlist" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}><Wishlist /></motion.div>} />
               <Route path="*" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}><NotFound /></motion.div>} />
             </Route>
-            <Route path="/admin" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="flex flex-col min-h-screen bg-white transition-colors duration-300"><Navbar /><Breadcrumbs /><div className="flex-1 flex min-h-0"><AdminDashboard /></div></motion.div>} />
+            <Route path="/admin" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="flex flex-col min-h-screen bg-white transition-colors duration-300"><header className="sticky top-0 z-[100]"><AnnouncementBar /><Navbar /></header><Breadcrumbs /><div className="flex-1 flex min-h-0"><AdminDashboard /></div></motion.div>} />
           </Routes>
         </motion.div>
       </AnimatePresence>
@@ -85,6 +104,7 @@ export default function App() {
         <BrowserRouter>
           <LoadingBar />
           <ScrollToTop />
+          <PageLoader />
           <PopupAdOverlay />
           <AnimatedRoutes />
         </BrowserRouter>

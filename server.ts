@@ -31,7 +31,14 @@ const COLLECTION_KEYS = [
   "homeAds",
   "admins",
   "otps",
-  "categories"
+  "categories",
+  "maintenance_mode",
+  "contactInfo",
+  "wishlist",
+  "comparison",
+  "reviews",
+  "announcements",
+  "socialLinks"
 ];
 
 let mongoClient: MongoClient | null = null;
@@ -110,15 +117,22 @@ async function readDb() {
       // Load all collections in parallel for maximum speed
       await Promise.all(
         COLLECTION_KEYS.map(async (key) => {
-          const docs = await mongo.collection(key).find({}).toArray();
-          dbObj[key] = docs.map((doc: any) => {
-            const item = { ...doc };
-            if (doc._id && !doc.id) {
-              item.id = doc._id.toString();
+          if (["maintenance_mode", "contactInfo", "wishlist", "comparison"].includes(key)) {
+            const doc = await mongo.collection(key).findOne({ _id: "singleton" as any });
+            if (doc && doc.value !== undefined) {
+              dbObj[key] = doc.value;
             }
-            delete item._id;
-            return item;
-          });
+          } else {
+            const docs = await mongo.collection(key).find({}).toArray();
+            dbObj[key] = docs.map((doc: any) => {
+              const item = { ...doc };
+              if (doc._id && !doc.id) {
+                item.id = doc._id.toString();
+              }
+              delete item._id;
+              return item;
+            });
+          }
         })
       );
 
@@ -203,6 +217,12 @@ async function writeDbKey(key: string, data: any): Promise<boolean> {
     if (mongo) {
       try {
         const col = mongo.collection(key);
+
+        if (["maintenance_mode", "contactInfo", "wishlist", "comparison"].includes(key)) {
+          await col.updateOne({ _id: "singleton" as any }, { $set: { value: data } }, { upsert: true });
+          return true;
+        }
+
         const array = Array.isArray(data) ? data : [];
         
         // 1. Get all existing IDs in the collection
@@ -292,8 +312,19 @@ function getTransporter() {
 }
 
 async function startServer() {
+  console.log("startServer function called...");
   const app = express();
   const PORT = 3000;
+
+  // API routes FIRST - even before middleware for debugging
+  app.get("/api/health", (req, res) => {
+    console.log("GET /api/health requested");
+    res.json({ status: "ok" });
+  });
+
+  app.get("/api/ping", (req, res) => {
+    res.send("pong");
+  });
 
   // IMPORTANT: Trust the first proxy (required for accurate rate limiting in our cloud environment)
   app.set("trust proxy", 1);
@@ -305,6 +336,7 @@ async function startServer() {
   }));
 
   // Rate limit for all API requests
+  /*
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
@@ -313,6 +345,7 @@ async function startServer() {
     message: { error: "Too many requests, please try again later." }
   });
   app.use("/api/", apiLimiter);
+  */
 
   // Stricter limiter for email/OTP routes to prevent abuse
   const sensitiveRateLimiter = rateLimit({
@@ -345,22 +378,29 @@ async function startServer() {
     return false;
   };
 
-  let vite: any;
-  if (process.env.NODE_ENV !== "production") {
-    vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-  }
-
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // API routes FIRST
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
+  console.log("Middleware configured, starting Vite if needed...");
 
+  // Vite middleware for development
+  let vite: any;
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Initializing Vite dev server...");
+    try {
+      vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      console.log("Vite dev server initialized.");
+    } catch (err) {
+      console.error("Failed to initialize Vite:", err);
+    }
+  }
+
+  // Health check was moved to top, but let's keep the others here or after basic middleware
+  // app.get("/api/health" ...) was moved to top
+  
   // --- Dynamic OG Tag Injection for Product Sharing ---
   app.get("/product/:id", async (req, res, next) => {
     try {
@@ -424,15 +464,38 @@ async function startServer() {
   app.get("/api/db", async (req, res) => {
     try {
       const db = await readDb();
-      // SECURITY: Sanitize admins to remove passwords from general fetch
-      if (db && db.admins) {
-        db.admins = db.admins.map((admin: any) => {
-          const { password, ...rest } = admin;
-          return rest;
-        });
+      // SECURITY: Sanitize admins to remove passwords and products to remove cost prices from general fetch
+      if (db) {
+        if (db.admins) {
+          db.admins = db.admins.map((admin: any) => {
+            const { password, ...rest } = admin;
+            return rest;
+          });
+        }
+        if (db.products) {
+          db.products = db.products.map((product: any) => {
+            const { costPrice, ...rest } = product;
+            return rest;
+          });
+        }
       }
       res.json(db || {});
     } catch (err: any) {
+      console.error("Error in GET /api/db:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/admin/db", async (req, res) => {
+    try {
+      const isAdmin = await authenticateAdminRequest(req);
+      if (!isAdmin) {
+        return res.status(401).json({ error: "Unauthorized access" });
+      }
+      const db = await readDb();
+      res.json(db || {});
+    } catch (err: any) {
+      console.error("Error in POST /api/admin/db:", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -621,6 +684,33 @@ async function startServer() {
       }
       const db = req.body;
       await writeDb(db);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+const PUBLIC_WRITABLE_KEYS = ["orders", "subscribers", "contactMessages", "reviews", "otps"];
+
+  app.post("/api/db/public-add", async (req, res) => {
+    try {
+      const { key, data } = req.body;
+      if (!key || !data) {
+        return res.status(400).json({ error: "Key and data are required" });
+      }
+
+      if (!PUBLIC_WRITABLE_KEYS.includes(key)) {
+        return res.status(403).json({ error: "Forbidden: Key is not publicly writable" });
+      }
+
+      const db = await readDb();
+      const collection = db[key] || [];
+      
+      // If it's an object, we append it. If it's an array, we merge? 
+      // Usually it's a single item.
+      const updatedCollection = [data, ...collection];
+      await writeDbKey(key, updatedCollection);
+      
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

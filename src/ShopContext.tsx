@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Product, Order, Category, Coupon, CartItem, CustomerInfo, Slide, CategoryBanner, LookbookImage, Subscriber, ContactMessage, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, OTPRecord, Review } from './types';
+import { Product, Order, Category, Coupon, CartItem, CustomerInfo, Slide, CategoryBanner, LookbookImage, Subscriber, ContactMessage, PopupAd, HomeAd, AdminUser, OTPRecord, Review, ContactInfo, Announcement, FAQItem, PolicyItem, SocialLink } from './types';
 import { initialProducts, initialCoupons, initialSlides, initialCategoryBanners, initialLookbook } from './mockData';
 import { generateId } from './lib/utils';
 
@@ -19,6 +19,7 @@ interface ShopContextType {
   faqs: FAQItem[];
   policies: PolicyItem[];
   categories: Category[];
+  contactInfo: ContactInfo;
   isAdminAuth: boolean;
   authToken: string | null;
   currentAdmin: AdminUser | null;
@@ -38,6 +39,9 @@ interface ShopContextType {
   addAdmin: (admin: AdminUser) => void;
   updateAdmin: (admin: AdminUser) => void;
   deleteAdmin: (id: string) => void;
+  updateContactInfo: (info: ContactInfo) => void;
+  isMaintenanceMode: boolean;
+  setMaintenanceMode: (status: boolean) => void;
   addSlide: (slide: Omit<Slide, 'id'>) => void;
   deleteSlide: (id: string) => void;
   updateSlide: (slide: Slide) => void;
@@ -93,6 +97,12 @@ interface ShopContextType {
   addReview: (review: Omit<Review, 'id' | 'status' | 'date'>) => { success: boolean; message: string };
   updateReviewStatus: (reviewId: string, status: Review['status']) => void;
   deleteReview: (reviewId: string) => void;
+  announcements: Announcement[];
+  addAnnouncement: (announcement: Omit<Announcement, 'id'>) => void;
+  updateAnnouncement: (announcement: Announcement) => void;
+  deleteAnnouncement: (id: string) => void;
+  socialLinks: SocialLink[];
+  updateSocialLinks: (links: SocialLink[]) => void;
 }
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -193,100 +203,92 @@ const DatabaseLoader = () => {
   );
 };
 
+const safeParse = (saved: string | null, fallback: any) => {
+  if (!saved || saved === 'undefined' || saved === 'null') return fallback;
+  try {
+    const parsed = JSON.parse(saved);
+    if (parsed === null) return fallback;
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+    return parsed;
+  } catch (e) {
+    console.error('Failed to parse from local storage:', e);
+    return fallback;
+  }
+};
+
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('ts_products');
-    const data = saved ? JSON.parse(saved) : initialProducts;
+    const data = safeParse(saved, initialProducts);
     return data.map((p: Product) => ({
       ...p,
       stock: p.stock !== undefined ? p.stock : 0
     }));
   });
 
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('ts_categories');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [categories, setCategories] = useState<Category[]>(() => safeParse(localStorage.getItem('ts_categories'), []));
 
-  const [faqs, setFaqs] = useState<FAQItem[]>(() => {
-    const saved = localStorage.getItem('ts_faqs');
-    return saved ? JSON.parse(saved) : defaultFAQs;
-  });
+  const [contactInfo, setContactInfo] = useState<ContactInfo>(() => safeParse(localStorage.getItem('ts_contact_info'), {
+    storeAddress: "Our Store(Dhaka)",
+    storeAddressSubtitle: "Dhaka Uddan\nDhaka, Bangladesh",
+    phone: "+8801515668345",
+    phoneSubtitle: "Saturday-Sunday, 9am - 8pm",
+    email: "neonthread@gmail.com",
+    emailSubtitle: "We typically reply within 24 hours"
+  }));
 
-  const [policies, setPolicies] = useState<PolicyItem[]>(() => {
-    const saved = localStorage.getItem('ts_policies');
-    return saved ? JSON.parse(saved) : defaultPolicies;
-  });
+  const [faqs, setFaqs] = useState<FAQItem[]>(() => safeParse(localStorage.getItem('ts_faqs'), defaultFAQs));
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('ts_orders');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [policies, setPolicies] = useState<PolicyItem[]>(() => safeParse(localStorage.getItem('ts_policies'), defaultPolicies));
 
-  const [coupons, setCoupons] = useState<Coupon[]>(() => {
-    const saved = localStorage.getItem('ts_coupons');
-    return saved ? JSON.parse(saved) : initialCoupons;
-  });
+  const [orders, setOrders] = useState<Order[]>(() => safeParse(localStorage.getItem('ts_orders'), []));
 
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem('ts_cart');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [coupons, setCoupons] = useState<Coupon[]>(() => safeParse(localStorage.getItem('ts_coupons'), initialCoupons));
 
-  const [slides, setSlides] = useState<Slide[]>(() => {
-    const saved = localStorage.getItem('ts_slides');
-    return saved ? JSON.parse(saved) : initialSlides;
-  });
+  const [cart, setCart] = useState<CartItem[]>(() => safeParse(localStorage.getItem('ts_cart'), []));
 
-  const [categoryBanners, setCategoryBanners] = useState<CategoryBanner[]>(() => {
-    const saved = localStorage.getItem('ts_category_banners');
-    return saved ? JSON.parse(saved) : initialCategoryBanners;
-  });
+  const [slides, setSlides] = useState<Slide[]>(() => safeParse(localStorage.getItem('ts_slides'), initialSlides));
 
-  const [lookbook, setLookbook] = useState<LookbookImage[]>(() => {
-    const saved = localStorage.getItem('ts_lookbook');
-    return saved ? JSON.parse(saved) : initialLookbook;
-  });
+  const [categoryBanners, setCategoryBanners] = useState<CategoryBanner[]>(() => safeParse(localStorage.getItem('ts_category_banners'), initialCategoryBanners));
 
-  const [subscribers, setSubscribers] = useState<Subscriber[]>(() => {
-    const saved = localStorage.getItem('ts_subscribers');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [lookbook, setLookbook] = useState<LookbookImage[]>(() => safeParse(localStorage.getItem('ts_lookbook'), initialLookbook));
 
-  const [contactMessages, setContactMessages] = useState<ContactMessage[]>(() => {
-    const saved = localStorage.getItem('ts_contact_msgs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [subscribers, setSubscribers] = useState<Subscriber[]>(() => safeParse(localStorage.getItem('ts_subscribers'), []));
 
-  const [popupAds, setPopupAds] = useState<PopupAd[]>(() => {
-    const saved = localStorage.getItem('ts_popup_ads');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>(() => safeParse(localStorage.getItem('ts_contact_msgs'), []));
 
-  const [homeAds, setHomeAds] = useState<HomeAd[]>(() => {
-    const saved = localStorage.getItem('ts_home_ads');
-    return saved ? JSON.parse(saved) : defaultHomeAds;
-  });
+  const [popupAds, setPopupAds] = useState<PopupAd[]>(() => safeParse(localStorage.getItem('ts_popup_ads'), []));
 
-  const [otps, setOtps] = useState<OTPRecord[]>(() => {
-    const saved = localStorage.getItem('ts_otps');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [homeAds, setHomeAds] = useState<HomeAd[]>(() => safeParse(localStorage.getItem('ts_home_ads'), defaultHomeAds));
 
-  const [wishlist, setWishlist] = useState<string[]>(() => {
-    const saved = localStorage.getItem('ts_wishlist');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [otps, setOtps] = useState<OTPRecord[]>(() => safeParse(localStorage.getItem('ts_otps'), []));
+
+  const [wishlist, setWishlist] = useState<string[]>(() => safeParse(localStorage.getItem('ts_wishlist'), []));
   
-  const [comparisonItems, setComparisonItems] = useState<string[]>(() => {
-    const saved = localStorage.getItem('ts_comparison');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [comparisonItems, setComparisonItems] = useState<string[]>(() => safeParse(localStorage.getItem('ts_comparison'), []));
 
-  const [reviews, setReviews] = useState<Review[]>(() => {
-    const saved = localStorage.getItem('ts_reviews');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [reviews, setReviews] = useState<Review[]>(() => safeParse(localStorage.getItem('ts_reviews'), []));
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => safeParse(localStorage.getItem('ts_announcements'), [
+    {
+      id: 'ann_1',
+      text: 'Special Offer: Free delivery on orders over ৳1500! (৳১৫০০ এর বেশি অর্ডার করলে ফ্রি ডেলিভারি!)',
+      isActive: true,
+      isMarquee: false,
+      backgroundColor: '#000000',
+      textColor: '#ffffff'
+    }
+  ]));
+
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>(() => safeParse(localStorage.getItem('ts_social_links'), [
+    { id: 'sl_fb', platform: 'facebook', url: '', isActive: false },
+    { id: 'sl_ig', platform: 'instagram', url: '', isActive: false },
+    { id: 'sl_wa', platform: 'whatsapp', url: '', isActive: false },
+    { id: 'sl_tk', platform: 'tiktok', url: '', isActive: false },
+    { id: 'sl_yt', platform: 'youtube', url: '', isActive: false },
+    { id: 'sl_x', platform: 'x', url: '', isActive: false }
+  ]));
+
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(() => safeParse(localStorage.getItem('ts_maintenance_mode'), false));
 
   const defaultSuperAdmin: AdminUser = {
     id: 'super_admin_id',
@@ -313,15 +315,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const [admins, setAdmins] = useState<AdminUser[]>(() => {
-    const saved = localStorage.getItem('ts_admins');
-    return saved ? JSON.parse(saved) : [defaultSuperAdmin];
-  });
+  const [admins, setAdmins] = useState<AdminUser[]>(() => safeParse(localStorage.getItem('ts_admins'), [defaultSuperAdmin]));
 
-  const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(() => {
-    const saved = localStorage.getItem('ts_current_admin');
-    return saved && saved !== '' && saved !== 'undefined' ? JSON.parse(saved) : null;
-  });
+  const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(() => safeParse(localStorage.getItem('ts_current_admin'), null));
 
   const [isAdminAuth, setIsAdminAuth] = useState<boolean>(() => {
     return !!localStorage.getItem('ts_admin_token');
@@ -348,6 +344,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (!res.ok) {
+        if (res.status === 401) {
+          // Clear invalid/expired admin token and log out
+          setCurrentAdmin(null);
+          setAuthToken(null);
+          setIsAdminAuth(false);
+        }
         let errorMsg = `Server error (${res.status})`;
         try {
           const errorData = await res.json();
@@ -368,10 +370,34 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const publicAdd = async (key: string, item: any) => {
+    try {
+      await fetch('/api/db/public-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, data: item })
+      });
+    } catch (err) {
+      console.error(`Failed to publicly add ${key}:`, err);
+    }
+  };
+
   useEffect(() => {
     const fetchDb = async () => {
       try {
-        const res = await fetch('/api/db');
+        const endpoint = authToken ? '/api/admin/db' : '/api/db';
+        const options: RequestInit = authToken ? {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: authToken })
+        } : {
+          method: 'GET'
+        };
+
+        const res = await fetch(endpoint, options);
+        if (!res.ok) {
+          throw new Error(`Server responded with ${res.status}`);
+        }
         const dbData = await res.json();
         
         if (dbData && Object.keys(dbData).length > 0) {
@@ -395,7 +421,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (dbData.homeAds) setHomeAds(dbData.homeAds);
           if (dbData.admins) setAdmins(dbData.admins);
           if (dbData.otps) setOtps(dbData.otps);
+          if (dbData.announcements) setAnnouncements(dbData.announcements);
+          if (dbData.socialLinks) setSocialLinks(dbData.socialLinks);
           if (dbData.comparison) setComparisonItems(dbData.comparison);
+          if (dbData.maintenance_mode !== undefined) setIsMaintenanceMode(dbData.maintenance_mode);
         } else {
           // Initialize server with local storage values or default mocks
           const initialDb = {
@@ -414,7 +443,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
             homeAds,
             admins,
             otps,
-            comparison: comparisonItems
+            announcements,
+            socialLinks,
+            comparison: comparisonItems,
+            maintenance_mode: isMaintenanceMode
           };
           await fetch('/api/db/init', {
             method: 'POST',
@@ -423,27 +455,49 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } catch (err) {
-        console.error("Failed to load DB from server:", err);
+        console.error("Failed to load DB from server, falling back to mock data:", err);
+        // Fallback to local mocks if server is unreachable
+        setProducts(initialProducts.map((p: any) => ({
+          ...p,
+          stock: p.stock !== undefined ? p.stock : 0
+        })));
+        setCoupons(initialCoupons);
+        setSlides(initialSlides);
+        setCategoryBanners(initialCategoryBanners);
+        setLookbook(initialLookbook);
+        // Note: other states like faqs, policies will remain empty defaults or as initialized in ShopProvider
       } finally {
         setIsDbLoaded(true);
       }
     };
     fetchDb();
-  }, []);
+  }, [authToken]);
 
   // Custom hook to prevent syncing on the first load of isDbLoaded
   function useServerSync(key: string, data: any, storageKey: string) {
-    const isFirstMount = React.useRef(true);
+    const previousDataRef = React.useRef(data);
+    const hasInitializedRef = React.useRef(false);
+
     useEffect(() => {
       localStorage.setItem(storageKey, JSON.stringify(data));
-      if (isDbLoaded) {
-        if (isFirstMount.current) {
-          isFirstMount.current = false;
-        } else {
-          serverSave(key, data);
-        }
+      
+      if (!isDbLoaded) {
+        previousDataRef.current = data;
+        return;
       }
-    }, [data, isDbLoaded, key, storageKey]);
+
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        previousDataRef.current = data;
+        return;
+      }
+
+      // Only save if the data actually changed from the previous state and user is admin
+      if (isAdminAuth && JSON.stringify(previousDataRef.current) !== JSON.stringify(data)) {
+        previousDataRef.current = data;
+        serverSave(key, data);
+      }
+    }, [data, isDbLoaded, key, storageKey, isAdminAuth]);
   }
 
   useServerSync('products', products, 'ts_products');
@@ -459,14 +513,21 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useServerSync('faqs', faqs, 'ts_faqs');
   useServerSync('policies', policies, 'ts_policies');
   useServerSync('categories', categories, 'ts_categories');
+  useServerSync('contactInfo', contactInfo, 'ts_contact_info');
   useServerSync('admins', admins, 'ts_admins');
   useServerSync('otps', otps, 'ts_otps');
   useServerSync('wishlist', wishlist, 'ts_wishlist');
+  useServerSync('announcements', announcements, 'ts_announcements');
   useServerSync('comparison', comparisonItems, 'ts_comparison');
   useServerSync('reviews', reviews, 'ts_reviews');
+  useServerSync('maintenance_mode', isMaintenanceMode, 'ts_maintenance_mode');
 
   useEffect(() => { 
-    localStorage.setItem('ts_cart', JSON.stringify(cart)); 
+    try {
+      localStorage.setItem('ts_cart', JSON.stringify(cart)); 
+    } catch (e) {
+      console.error('Failed to save cart to local storage', e);
+    }
   }, [cart]);
 
   // Keep currentAdmin in sync with the central admins list
@@ -565,6 +626,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setReviews(prev => [newReview, ...prev]);
+    publicAdd('reviews', newReview);
     return { success: true, message: 'Review submitted for moderation! (রিভিউটি অনুমোদনের জন্য পাঠানো হয়েছে!)' };
   };
 
@@ -574,6 +636,23 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteReview = (reviewId: string) => {
     setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, deleted: true } : r));
+  };
+
+  const addAnnouncement = (announcement: Omit<Announcement, 'id'>) => {
+    setAnnouncements(prev => [{ ...announcement, id: generateId() }, ...prev]);
+  };
+
+  const updateAnnouncement = (announcement: Announcement) => {
+    setAnnouncements(prev => prev.map(a => a.id === announcement.id ? announcement : a));
+  };
+
+  const deleteAnnouncement = (id: string) => {
+    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, deleted: true } : a));
+  };
+
+  const updateSocialLinks = (links: SocialLink[]) => {
+    setSocialLinks(links);
+    serverSave('socialLinks', links);
   };
 
   const loginAdmin = async (email: string, pass: string) => {
@@ -636,6 +715,10 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentAdmin && currentAdmin.id === admin.id) {
       setCurrentAdmin(admin);
     }
+  };
+
+  const updateContactInfo = (info: ContactInfo) => {
+    setContactInfo(info);
   };
 
   const deleteAdmin = (id: string) => {
@@ -829,6 +912,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     setOrders(prev => [newOrder, ...prev]);
+    publicAdd('orders', newOrder);
     clearCart();
     return { success: true, orderId: newOrder.id };
   };
@@ -999,7 +1083,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addSubscriber = (email: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!subscribers.find(s => s.email && s.email.trim().toLowerCase() === normalizedEmail)) {
-      setSubscribers(prev => [{ id: generateId(), email: normalizedEmail, date: new Date().toISOString() }, ...prev]);
+      const newSub = { id: generateId(), email: normalizedEmail, date: new Date().toISOString() };
+      setSubscribers(prev => [newSub, ...prev]);
+      publicAdd('subscribers', newSub);
     }
   };
   const deleteSubscriber = (id: string) => {
@@ -1009,7 +1095,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addContactMessage = (msg: Omit<ContactMessage, 'id' | 'date'>) => {
-    setContactMessages(prev => [{ ...msg, id: generateId(), date: new Date().toISOString() }, ...prev]);
+    const newMsg = { ...msg, id: generateId(), date: new Date().toISOString() };
+    setContactMessages(prev => [newMsg, ...prev]);
+    publicAdd('contactMessages', newMsg);
   };
   const deleteContactMessage = (id: string) => {
     const msg = contactMessages.find(m => m.id === id);
@@ -1062,17 +1150,16 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addOTP = (phone: string, otp: string, email?: string) => {
-    setOtps(prev => [
-      {
-         id: generateId(),
-         phone,
-         email,
-         otp,
-         createdAt: new Date().toISOString(),
-         verified: false
-      },
-      ...prev
-    ]);
+    const newOtp = {
+      id: generateId(),
+      phone,
+      email,
+      otp,
+      createdAt: new Date().toISOString(),
+      verified: false
+    };
+    setOtps(prev => [newOtp, ...prev]);
+    publicAdd('otps', newOtp);
   };
 
   const deleteOTP = (id: string) => {
@@ -1101,15 +1188,18 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       faqs: faqs.filter(f => !f.deleted), 
       policies: policies.filter(p => !p.deleted), 
       categories: categories.filter(c => !c.deleted),
+      contactInfo,
       isAdminAuth,
       authToken,
       currentAdmin, 
       admins: admins.filter(a => a.isActive !== false), 
       otps: otps.filter(o => !o.deleted), 
+      isMaintenanceMode,
+      setMaintenanceMode: setIsMaintenanceMode,
       getProductPriceForSize,
       getProductStockForSize,
       addToCart, removeFromCart, updateCartQuantity, updateCartItemSize, clearCart, placeOrder,
-      loginAdmin, logoutAdmin, updateProfile, addAdmin, updateAdmin, deleteAdmin, addProduct, updateProduct, deleteProduct,
+      loginAdmin, logoutAdmin, updateProfile, addAdmin, updateAdmin, deleteAdmin, updateContactInfo, addProduct, updateProduct, deleteProduct,
       addSlide, updateSlide, deleteSlide, addCategoryBanner, updateCategoryBanner, deleteCategoryBanner, 
       addCategory, updateCategory, deleteCategory,
       addLookbookImage, updateLookbookImage, deleteLookbookImage,
@@ -1122,7 +1212,9 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isDarkMode, toggleDarkMode, isCartOpen, setIsCartOpen,
       wishlist, toggleWishlist,
       comparisonItems, toggleComparison, clearComparison,
-      reviews: reviews.filter(r => !r.deleted), addReview, updateReviewStatus, deleteReview
+      reviews: reviews.filter(r => !r.deleted), addReview, updateReviewStatus, deleteReview,
+      announcements: announcements.filter(a => !a.deleted), addAnnouncement, updateAnnouncement, deleteAnnouncement,
+      socialLinks, updateSocialLinks
     }}>
       {children}
     </ShopContext.Provider>

@@ -4,7 +4,7 @@ import { useShop } from '../ShopContext';
 import Swal from 'sweetalert2';
 
 export default function Contact() {
-  const { addContactMessage } = useShop();
+  const { addContactMessage, contactInfo } = useShop();
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [isSending, setIsSending] = useState(false);
 
@@ -59,8 +59,8 @@ export default function Contact() {
                 <MapPin className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1 uppercase tracking-tight">Our Store(Dhaka)</h3>
-                <p className="text-gray-500 text-sm font-medium">Dhaka Uddan<br/>Dhaka, Bangladesh</p>
+                <h3 className="font-bold text-lg mb-1 uppercase tracking-tight">{contactInfo?.storeAddress || 'Our Store'}</h3>
+                <p className="text-gray-500 text-sm font-medium whitespace-pre-wrap">{contactInfo?.storeAddressSubtitle || ''}</p>
               </div>
             </div>
             
@@ -70,8 +70,8 @@ export default function Contact() {
               </div>
               <div>
                 <h3 className="font-bold text-lg mb-1 uppercase tracking-tight">Phone / WhatsApp</h3>
-                <p className="text-gray-500 text-sm font-medium">+8801515668345</p>
-                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">Saturday-Sunday, 9am - 8pm</p>
+                <p className="text-gray-500 text-sm font-medium">{contactInfo?.phone || ''}</p>
+                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">{contactInfo?.phoneSubtitle || ''}</p>
               </div>
             </div>
             
@@ -81,8 +81,8 @@ export default function Contact() {
               </div>
               <div>
                 <h3 className="font-bold text-lg mb-1 uppercase tracking-tight">Email</h3>
-                <p className="text-gray-500 text-sm font-medium">neonthread@gmail.com</p>
-                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">We typically reply within 24 hours</p>
+                <p className="text-gray-500 text-sm font-medium">{contactInfo?.email || ''}</p>
+                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">{contactInfo?.emailSubtitle || ''}</p>
               </div>
             </div>
           </div>

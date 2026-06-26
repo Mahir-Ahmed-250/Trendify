@@ -23,6 +23,16 @@ export default function ProductCard({ product }: { product: Product, key?: React
     return cart ? cart.some(item => item.id === product.id) : false;
   }, [cart, product.id]);
 
+  React.useEffect(() => {
+    if (showSizeModal) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setShowSizeModal(false);
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [showSizeModal]);
+
   const productReviews = useMemo(() => {
     return reviews.filter(r => r.productId === product.id && r.status === 'approved');
   }, [reviews, product.id]);

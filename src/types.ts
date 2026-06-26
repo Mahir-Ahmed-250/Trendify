@@ -79,6 +79,7 @@ export interface Product {
   serial?: number;
   stock: number;
   oldPrice?: number;
+  costPrice?: number;
   sizePrices?: { [size: string]: number };
   sizeStocks?: { [size: string]: number };
   deleted?: boolean;
@@ -186,6 +187,35 @@ export interface OTPRecord {
   createdAt: string;
   verified: boolean;
   deleted?: boolean;
+}
+
+export interface ContactInfo {
+  storeAddress: string;
+  storeAddressSubtitle: string;
+  phone: string;
+  phoneSubtitle: string;
+  email: string;
+  emailSubtitle: string;
+}
+
+export interface Announcement {
+  id: string;
+  text: string;
+  link?: string;
+  isActive: boolean;
+  isMarquee?: boolean;
+  startDate?: string;
+  endDate?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  deleted?: boolean;
+}
+
+export interface SocialLink {
+  id: string;
+  platform: 'facebook' | 'instagram' | 'whatsapp' | 'tiktok' | 'youtube' | 'x';
+  url: string;
+  isActive: boolean;
 }
 
 export interface AdminUser {

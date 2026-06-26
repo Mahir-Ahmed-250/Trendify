@@ -17,7 +17,7 @@ export default function Home() {
 
   useEffect(() => {
     // Simulate initial loading for skeleton effect
-    const timer = setTimeout(() => setLoading(false), 1200);
+    const timer = setTimeout(() => setLoading(false), 200);
     return () => clearTimeout(timer);
   }, []);
 

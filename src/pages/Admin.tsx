@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, PieChart, Pie, Legend } from 'recharts';
 import { useShop } from '../ShopContext';
-import { Package, ShoppingBag, Ticket, Trash2, Plus, Minus, Edit, LogOut, Layout, Image, Camera, X, Users, Mail, MonitorPlay, Printer, HelpCircle, ShieldCheck, ShieldAlert, Ruler, ShoppingBasket, Home, TrendingUp, DollarSign, PackageCheck, UserCircle, Settings, Megaphone, MessageSquare, Search, Calendar, MapPin, Truck, CheckCircle, XCircle, Download, Clock, Bell, Key, History, Loader2, Star, Tag, Layers, Check } from 'lucide-react';
-import { Product, Category, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, LookbookImage, CategoryBanner, Coupon, Order, AdminPermissions, Review } from '../types';
+import { Package, ShoppingBag, Ticket, Trash2, Plus, Minus, Edit, LogOut, Layout, Image, Camera, X, Users, Mail, MonitorPlay, Printer, HelpCircle, ShieldCheck, ShieldAlert, Ruler, ShoppingBasket, Home, TrendingUp, DollarSign, PackageCheck, UserCircle, Settings, Megaphone, MessageSquare, Search, Calendar, MapPin, Truck, CheckCircle, XCircle, Download, Clock, Bell, Key, History, Loader2, Star, Tag, Layers, Check, Phone, Facebook, Instagram, Youtube, Twitter, Music2, Share2 } from 'lucide-react';
+import { Product, Category, PopupAd, FAQItem, PolicyItem, HomeAd, AdminUser, LookbookImage, CategoryBanner, Coupon, Order, AdminPermissions, Review, Announcement, SocialLink } from '../types';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 import { compressImage, fileToBase64 } from '../lib/imageUtils';
@@ -26,6 +26,516 @@ const SummaryCard = ({ title, count, icon: Icon, alert }: { title: string, count
 // Helper for DD/MM/YYYY
 const formatDate = (date: string | number | Date) => new Date(date).toLocaleDateString('en-GB');
 const formatTime = (date: string | number | Date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+const WhatsAppIcon = ({ size = 18, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.438 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .014 5.398 0 12.037c0 2.125.556 4.2 1.611 6.037l-1.711 6.251 6.391-1.677a11.845 11.845 0 005.759 1.484h.005c6.637 0 12.036-5.398 12.037-12.039a11.75 11.75 0 00-3.526-8.383z"/>
+  </svg>
+);
+
+const XIcon = ({ size = 18, className = "" }: { size?: number, className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="currentColor" 
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932L18.901 1.153zM17.61 20.644h2.039L6.486 3.24H4.298L17.61 20.644z"/>
+  </svg>
+);
+
+function AdminSocialLinksView() {
+  const { socialLinks, updateSocialLinks } = useShop();
+  const [links, setLinks] = useState(socialLinks);
+
+  useEffect(() => {
+    setLinks(socialLinks);
+  }, [socialLinks]);
+
+  const handleToggle = (id: string) => {
+    const newLinks = links.map(link => link.id === id ? { ...link, isActive: !link.isActive } : link);
+    setLinks(newLinks);
+    updateSocialLinks(newLinks);
+  };
+
+  const handleUrlChange = (id: string, url: string) => {
+    const newLinks = links.map(link => link.id === id ? { ...link, url } : link);
+    setLinks(newLinks);
+    updateSocialLinks(newLinks);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-black uppercase tracking-tight">Social Media Links</h1>
+          <p className="text-xs text-gray-500 font-medium"></p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {links.map((link) => (
+          <div key={link.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${link.isActive ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}>
+                   {link.platform === 'facebook' && <Facebook size={20} />}
+                   {link.platform === 'instagram' && <Instagram size={20} />}
+                   {link.platform === 'whatsapp' && <WhatsAppIcon size={20} />}
+                   {link.platform === 'tiktok' && <Music2 size={20} />}
+                   {link.platform === 'youtube' && <Youtube size={20} />}
+                   {link.platform === 'x' && <XIcon size={20} />}
+                </div>
+                <span className="font-bold uppercase text-xs tracking-widest">{link.platform}</span>
+              </div>
+              <button
+                onClick={() => handleToggle(link.id)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${link.isActive ? 'bg-black' : 'bg-gray-200'}`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${link.isActive ? 'translate-x-5' : 'translate-x-0'}`}
+                />
+              </button>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">URL / Link</label>
+              <input 
+                type="text" 
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-1 focus:ring-black outline-none transition-all"
+                placeholder={`Enter ${link.platform} profile link...`}
+                value={link.url}
+                onChange={(e) => handleUrlChange(link.id, e.target.value)}
+                disabled={!link.isActive}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminSettingsView() {
+  const { isMaintenanceMode, setMaintenanceMode } = useShop();
+
+  const handleToggle = () => {
+    setMaintenanceMode(!isMaintenanceMode);
+    Swal.fire({
+      icon: 'success',
+      title: !isMaintenanceMode ? 'Maintenance Mode Enabled' : 'Maintenance Mode Disabled',
+      text: !isMaintenanceMode 
+        ? 'Your website is now in maintenance mode. Only admins can access it.' 
+        : 'Your website is now live.',
+      timer: 2000,
+      showConfirmButton: false
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-black uppercase tracking-tight">Global Settings</h1>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+          <div>
+            <h3 className="font-bold text-lg text-black">Maintenance Mode</h3>
+            <p className="text-sm font-medium text-gray-500 mt-1">Take the website offline for visitors while you make updates. Only you and other admins can access the site.</p>
+          </div>
+          <button 
+            onClick={handleToggle}
+            className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-opacity-75 ${isMaintenanceMode ? 'bg-amber-500' : 'bg-gray-200'}`}
+          >
+            <span className="sr-only">Toggle Maintenance Mode</span>
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isMaintenanceMode ? 'translate-x-8' : 'translate-x-0'}`}
+            />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminContactInfoView() {
+  const { contactInfo, updateContactInfo } = useShop();
+  const [formData, setFormData] = useState({
+    storeAddress: contactInfo?.storeAddress || '',
+    storeAddressSubtitle: contactInfo?.storeAddressSubtitle || '',
+    phone: contactInfo?.phone || '',
+    phoneSubtitle: contactInfo?.phoneSubtitle || '',
+    email: contactInfo?.email || '',
+    emailSubtitle: contactInfo?.emailSubtitle || ''
+  });
+
+  const handleSave = () => {
+    updateContactInfo(formData);
+    Swal.fire('Updated!', 'Contact info updated successfully.', 'success');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-black uppercase tracking-tight">Contact Page Info</h1>
+        <button onClick={handleSave} className="bg-black text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors shadow-lg shadow-black/20">
+          Save Changes
+        </button>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <h3 className="font-bold border-b border-gray-100 pb-2">Store Address</h3>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Title</label>
+              <input type="text" value={formData.storeAddress} onChange={e => setFormData({...formData, storeAddress: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none" placeholder="e.g. Our Store(Dhaka)" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Subtitle / Address Details</label>
+              <textarea rows={3} value={formData.storeAddressSubtitle} onChange={e => setFormData({...formData, storeAddressSubtitle: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none" placeholder="e.g. Dhaka Uddan&#10;Dhaka, Bangladesh" />
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <h3 className="font-bold border-b border-gray-100 pb-2">Phone / WhatsApp</h3>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Phone Number</label>
+              <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none" placeholder="e.g. +8801515668345" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Subtitle / Availability</label>
+              <input type="text" value={formData.phoneSubtitle} onChange={e => setFormData({...formData, phoneSubtitle: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none" placeholder="e.g. Saturday-Sunday, 9am - 8pm" />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="font-bold border-b border-gray-100 pb-2">Email</h3>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Email Address</label>
+              <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none" placeholder="e.g. neonthread@gmail.com" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Subtitle</label>
+              <input type="text" value={formData.emailSubtitle} onChange={e => setFormData({...formData, emailSubtitle: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none" placeholder="e.g. We typically reply within 24 hours" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function AdminAnnouncementsView() {
+  const { announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement } = useShop();
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [formData, setFormData] = useState({
+    text: '',
+    link: '',
+    isActive: true,
+    isMarquee: false,
+    startDate: '',
+    endDate: '',
+    backgroundColor: '#000000',
+    textColor: '#ffffff'
+  });
+
+  const resetForm = () => {
+    setFormData({ text: '', link: '', isActive: true, isMarquee: false, startDate: '', endDate: '', backgroundColor: '#000000', textColor: '#ffffff' });
+    setEditingAnnouncement(null);
+    setIsAdding(false);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.text.trim()) return;
+
+    if (editingAnnouncement) {
+      updateAnnouncement({ ...editingAnnouncement, ...formData });
+      Swal.fire('Updated!', 'Announcement updated successfully.', 'success');
+    } else {
+      addAnnouncement(formData);
+      Swal.fire('Added!', 'New announcement added successfully.', 'success');
+    }
+    resetForm();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+        <div>
+          <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">Manage Announcements </h1>
+          <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1"></p>
+        </div>
+        <button 
+          onClick={() => {
+            resetForm();
+            setIsAdding(true);
+          }}
+          className="bg-black text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-black/10 hover:bg-gray-800 transition-all active:scale-95"
+        >
+          <Plus size={14} className="stroke-[3]" /> Add New Announcement
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {isAdding && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-2xl shadow-black/5 space-y-6 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-2 h-full bg-black"></div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
+              <div className="w-1.5 h-4 bg-black rounded-full"></div>
+              {editingAnnouncement ? 'Edit Announcement' : 'Create New Announcement'}
+            </h3>
+            <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Announcement Text (ঘোষণা টেক্সট)</label>
+                <textarea 
+                  required
+                  rows={2}
+                  className="w-full border border-gray-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-sm font-medium bg-gray-50/50"
+                  placeholder="যেমন- Special Offer: Free delivery on orders over ৳1500!"
+                  value={formData.text}
+                  onChange={e => setFormData({...formData, text: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Destination Link (Optional)</label>
+                <input 
+                  type="text" 
+                  className="w-full border border-gray-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-sm font-medium bg-gray-50/50"
+                  placeholder="যেমন- /shop বা /product/123"
+                  value={formData.link}
+                  onChange={e => setFormData({...formData, link: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Start Date & Time (Optional)</label>
+                <input 
+                  type="datetime-local" 
+                  className="w-full border border-gray-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-sm font-medium bg-gray-50/50"
+                  value={formData.startDate}
+                  onChange={e => setFormData({...formData, startDate: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">End Date & Time (Optional)</label>
+                <input 
+                  type="datetime-local" 
+                  className="w-full border border-gray-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-sm font-medium bg-gray-50/50"
+                  value={formData.endDate}
+                  onChange={e => setFormData({...formData, endDate: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Background Color</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="color" 
+                    className="h-12 w-12 border-none rounded-lg cursor-pointer"
+                    value={formData.backgroundColor}
+                    onChange={e => setFormData({...formData, backgroundColor: e.target.value})}
+                  />
+                  <input 
+                    type="text"
+                    className="flex-1 border border-gray-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-sm font-mono bg-gray-50/50"
+                    value={formData.backgroundColor}
+                    onChange={e => setFormData({...formData, backgroundColor: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Text Color</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="color" 
+                    className="h-12 w-12 border-none rounded-lg cursor-pointer"
+                    value={formData.textColor}
+                    onChange={e => setFormData({...formData, textColor: e.target.value})}
+                  />
+                  <input 
+                    type="text"
+                    className="flex-1 border border-gray-200 rounded-2xl px-5 py-3.5 focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all text-sm font-mono bg-gray-50/50"
+                    value={formData.textColor}
+                    onChange={e => setFormData({...formData, textColor: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100 md:col-span-2">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="ann-active" 
+                    checked={formData.isActive} 
+                    onChange={e => setFormData({...formData, isActive: e.target.checked})} 
+                    className="w-4 h-4 text-black focus:ring-black" 
+                  />
+                  <label htmlFor="ann-active" className="text-xs font-bold uppercase tracking-widest text-gray-900 cursor-pointer select-none">Active (সক্রিয়)</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="ann-marquee" 
+                    checked={formData.isMarquee} 
+                    onChange={e => setFormData({...formData, isMarquee: e.target.checked})} 
+                    className="w-4 h-4 text-black focus:ring-black" 
+                  />
+                  <label htmlFor="ann-marquee" className="text-xs font-bold uppercase tracking-widest text-gray-900 cursor-pointer select-none">Marquee Effect (স্ক্রোলিং টেক্সট)</label>
+                </div>
+              </div>
+              <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button 
+                  type="button"
+                  onClick={resetForm}
+                  className="px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="bg-black text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-black/20 hover:bg-gray-800 transition-all active:scale-95"
+                >
+                  {editingAnnouncement ? 'Update Announcement' : 'Create Announcement'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Content</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Schedule</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Styles</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Status</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {announcements.map(ann => (
+              <tr key={ann.id} className="group hover:bg-gray-50/50 transition-colors">
+                <td className="px-6 py-6">
+                  <div className="space-y-1">
+                    <p className="font-bold text-sm text-gray-900">{ann.text}</p>
+                    {ann.link && <p className="text-[10px] font-mono text-gray-400">{ann.link}</p>}
+                  </div>
+                </td>
+                <td className="px-6 py-6">
+                  {ann.startDate || ann.endDate ? (
+                    <div className="space-y-1 text-[10px] font-bold text-gray-500 uppercase tracking-tight">
+                      {ann.startDate && (
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={10} className="text-gray-400" /> 
+                          Start: {new Date(ann.startDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </div>
+                      )}
+                      {ann.endDate && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock size={10} className="text-gray-400" /> 
+                          End: {new Date(ann.endDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Always Visible</span>
+                  )}
+                </td>
+                <td className="px-6 py-6">
+                  <div className="flex gap-2">
+                    <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: ann.backgroundColor }} title={`BG: ${ann.backgroundColor}`}></div>
+                    <div className="w-6 h-6 rounded border border-gray-200" style={{ backgroundColor: ann.textColor }} title={`Text: ${ann.textColor}`}></div>
+                  </div>
+                </td>
+                <td className="px-6 py-6">
+                  <div className="flex flex-col gap-1.5">
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest w-fit ${ann.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                      {ann.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    {ann.isMarquee && (
+                      <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest w-fit bg-purple-100 text-purple-700">
+                        Marquee
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-6 text-right">
+                  <div className="flex justify-end gap-1">
+                    <button 
+                      onClick={() => {
+                        resetForm(); // Reset first to clear any stale state
+                        setEditingAnnouncement(ann);
+                        setFormData({
+                          text: ann.text,
+                          link: ann.link || '',
+                          isActive: ann.isActive,
+                          isMarquee: ann.isMarquee || false,
+                          startDate: ann.startDate || '',
+                          endDate: ann.endDate || '',
+                          backgroundColor: ann.backgroundColor || '#000000',
+                          textColor: ann.textColor || '#ffffff'
+                        });
+                        setIsAdding(true);
+                      }}
+                      className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-xl transition-all"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        const res = await Swal.fire({
+                          title: 'Delete Announcement?',
+                          text: "This action cannot be undone.",
+                          icon: 'warning',
+                          showCancelButton: true,
+                          confirmButtonColor: '#000',
+                          cancelButtonColor: '#d33',
+                          confirmButtonText: 'Delete'
+                        });
+                        if (res.isConfirmed) {
+                          deleteAnnouncement(ann.id);
+                          Swal.fire('Deleted!', '', 'success');
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {announcements.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-6 py-12 text-center text-gray-400 italic text-sm">
+                  No announcements found. Add one to show at the top of the site.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function AdminCategoriesView() {
     const { categories, addCategory, updateCategory, deleteCategory } = useShop();
@@ -57,8 +567,8 @@ function AdminCategoriesView() {
       <div className="space-y-6">
         <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
           <div>
-            <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">Manage Categories 🏷️</h1>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">পণ্যগুলোর জন্য বিভিন্ন ক্যাটাগরি তৈরি ও সেটিং করুন।</p>
+            <h1 className="text-2xl font-black uppercase tracking-tight text-gray-900">Manage Categories</h1>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1"></p>
           </div>
           <button 
             onClick={() => setIsAdding(true)}
@@ -379,9 +889,9 @@ function AdminReviewsView() {
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-100 pb-4 gap-4">
         <div>
           <h1 className="text-2xl font-black uppercase text-gray-900 tracking-tight flex items-center gap-2">
-            <MessageSquare className="h-6 w-6 text-amber-500" /> Product Reviews Management 🌟
+            Product Reviews Management
           </h1>
-          <p className="text-xs text-gray-500 font-medium">কাস্টমারদের দেওয়া রিভিউগুলো চেক করুন এবং ঠিক করুন কোনটি সাইটে দেখাবে আর কোনটি দেখাবে না।</p>
+          <p className="text-xs text-gray-500 font-medium"></p>
         </div>
       </div>
 
@@ -530,6 +1040,170 @@ const getOrderTotals = (order: any) => {
   return { actualShipping, actualTotalPayable };
 };
 
+function AdminPriceAnalysisView() {
+  const { products, categories } = useShop();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         (p.code && p.code.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const totalCostValue = filteredProducts.reduce((acc, p) => acc + ((p.costPrice || 0) * (p.stock || 0)), 0);
+  const totalRetailValue = filteredProducts.reduce((acc, p) => acc + (p.price * (p.stock || 0)), 0);
+  const potentialProfit = totalRetailValue - totalCostValue;
+  const averageMargin = totalRetailValue > 0 ? (potentialProfit / totalRetailValue) * 100 : 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-black uppercase tracking-tight">Product Price Analysis</h1>
+          <p className="text-xs text-gray-500 font-medium">Analyze cost prices, profit margins, and inventory value.</p>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-blue-50 rounded-xl">
+              <DollarSign className="w-5 h-5 text-blue-600" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Inventory Cost</span>
+          </div>
+          <p className="text-2xl font-black">৳{totalCostValue.toLocaleString()}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-purple-50 rounded-xl">
+              <TrendingUp className="w-5 h-5 text-purple-600" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Potential Revenue</span>
+          </div>
+          <p className="text-2xl font-black">৳{totalRetailValue.toLocaleString()}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-green-50 rounded-xl">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Potential Profit</span>
+          </div>
+          <p className="text-2xl font-black text-green-600">৳{potentialProfit.toLocaleString()}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-orange-50 rounded-xl">
+              <Package className="w-5 h-5 text-orange-600" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Avg. Profit Margin</span>
+          </div>
+          <p className="text-2xl font-black">{averageMargin.toFixed(1)}%</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input 
+            type="text"
+            placeholder="Search product by name or code..."
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-1 focus:ring-black focus:outline-none transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <select 
+          className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none appearance-none cursor-pointer pr-10"
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+        >
+          <option value="all">All Categories</option>
+          {categories.map(cat => (
+            <option key={cat.id} value={cat.name}>{cat.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Product Analysis Table */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest">Product Info</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest text-center">Cost Price</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest text-center">Selling Price</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest text-center">Margin (৳)</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest text-center">Margin (%)</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest text-center">Stock</th>
+                <th className="p-4 font-black uppercase text-[10px] text-gray-400 tracking-widest text-right">Potential Profit</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredProducts.map((product) => {
+                const cost = product.costPrice || 0;
+                const selling = product.price;
+                const profitPerUnit = selling - cost;
+                const marginPercent = selling > 0 ? (profitPerUnit / selling) * 100 : 0;
+                const totalPotentialProfit = profitPerUnit * (product.stock || 0);
+
+                return (
+                  <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <img src={product.image} alt={product.name} className="w-10 h-10 rounded-xl object-cover border border-gray-100" />
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 leading-tight">{product.name}</p>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{product.code || 'NO-CODE'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4 text-center font-bold text-gray-600">৳{cost}</td>
+                    <td className="p-4 text-center font-bold text-gray-900">৳{selling}</td>
+                    <td className="p-4 text-center font-bold text-green-600">৳{profitPerUnit}</td>
+                    <td className="p-4 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                        marginPercent > 40 ? 'bg-green-100 text-green-700' : 
+                        marginPercent > 20 ? 'bg-blue-100 text-blue-700' : 
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {marginPercent.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="p-4 text-center font-bold text-gray-500">{product.stock}</td>
+                    <td className="p-4 text-right">
+                      <p className="text-sm font-black text-gray-900">৳{totalPotentialProfit.toLocaleString()}</p>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filteredProducts.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <Package className="w-12 h-12 opacity-20" />
+                      <p className="text-sm font-bold uppercase tracking-widest">No products found</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<{
@@ -549,7 +1223,15 @@ export default function AdminDashboard() {
   const { products, reviews, updateReviewStatus, deleteReview, orders, coupons, slides, updateSlide, categoryBanners, updateCategoryBanner, lookbook, subscribers, contactMessages, popupAds, homeAds, faqs, policies, categories, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct, updateOrderStatus, updateOrderNotes, updateOrder, deleteOrder, addCoupon, updateCoupon, deleteCoupon, addSlide, deleteSlide, addCategoryBanner, deleteCategoryBanner, addLookbookImage, updateLookbookImage, deleteLookbookImage, deleteSubscriber, deleteContactMessage, addPopupAd, deletePopupAd, updatePopupAd, addHomeAd, deleteHomeAd, updateHomeAd, addFAQ, updateFAQ, deleteFAQ, addPolicy, updatePolicy, deletePolicy, isAdminAuth, loginAdmin, logoutAdmin, updateProfile, currentAdmin, admins, addAdmin, updateAdmin, deleteAdmin } = useShop();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'shop' | 'collection' | 'orders' | 'coupons' | 'slides' | 'categories' | 'lookbook' | 'subscribers' | 'messages' | 'ads' | 'faqs' | 'policies' | 'admins' | 'profile' | 'reviews' | 'activities' | 'otps'>('dashboard');
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'shop' | 'collection' | 'orders' | 'coupons' | 'slides' | 'categories' | 'lookbook' | 'subscribers' | 'messages' | 'ads' | 'faqs' | 'policies' | 'admins' | 'profile' | 'reviews' | 'activities' | 'otps' | 'contactinfo' | 'settings' | 'socials' | 'analysis'>('dashboard');
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
   const [isAddingFAQ, setIsAddingFAQ] = useState(false);
   const [editingFAQ, setEditingFAQ] = useState<FAQItem | null>(null);
   const [newFAQ, setNewFAQ] = useState<Omit<FAQItem, 'id'>>({ question: '', answer: '' });
@@ -1047,6 +1729,8 @@ export default function AdminDashboard() {
         faqs: 'faqs',
         subscribers: 'subscribers',
         messages: 'messages',
+        contactinfo: 'messages',
+        settings: 'dashboard',
         policies: 'policies',
         otps: 'otps'
       };
@@ -1270,7 +1954,6 @@ export default function AdminDashboard() {
   const [editingHomeAd, setEditingHomeAd] = useState<HomeAd | null>(null);
   const [adsSubTab, setAdsSubTab] = useState<'popup' | 'home'>('home');
 
-  const [adminSearchQuery, setAdminSearchQuery] = useState('');
   const [adminCategoryFilter, setAdminCategoryFilter] = useState('all');
   const [adminHotSaleFilter, setAdminHotSaleFilter] = useState('all');
   const [adminSortBy, setAdminSortBy] = useState('newest');
@@ -1903,12 +2586,12 @@ export default function AdminDashboard() {
             className="fixed lg:relative inset-y-0 left-0 z-50 w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 p-4 lg:p-6 flex flex-col h-full"
           >
             <div className="border-b dark:border-gray-800 pb-4 mb-4">
-              <div className="flex flex-col items-center mb-10">
+              <div className="flex flex-col items-center mb-6">
                 <h2 className="text-xl font-black uppercase tracking-tighter text-gray-900 group-hover:text-blue-600 transition-colors">Admin Panel</h2>
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="mt-4 w-36 h-36 rounded-full border-2 border-gray-100 p-0.5 overflow-hidden shadow-sm"
+                  className="mt-4 w-32 h-32 rounded-full border-2 border-gray-100 p-0.5 overflow-hidden shadow-sm"
                 >
                   {currentAdmin?.image ? (
                     <img src={currentAdmin.image} alt="Admin"  className="w-full h-full object-cover rounded-full" />
@@ -1922,6 +2605,7 @@ export default function AdminDashboard() {
                   <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">{currentAdmin?.name || 'Main Admin'}</p>
                 </div>
               </div>
+
               {currentAdmin && (
                 <div className="mt-2 text-xs">
                   <span className="font-bold text-gray-400 block uppercase tracking-wide">Logged in as:</span>
@@ -1938,10 +2622,22 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+
+            {/* Sidebar Search Bar */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <input 
+                type="text"
+                placeholder="Search menu..."
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl py-2 pl-9 pr-3 text-[11px] font-bold focus:outline-none focus:ring-1 focus:ring-black transition-all"
+                value={adminSearchQuery}
+                onChange={(e) => setAdminSearchQuery(e.target.value)}
+              />
+            </div>
             
             <nav className="space-y-1.5 flex-1 overflow-y-auto overflow-x-hidden pr-1">
               {/* Dashboard Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.dashboard) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.dashboard) && (!adminSearchQuery || "Dashboard".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -1953,7 +2649,7 @@ export default function AdminDashboard() {
               )}
     
               {/* Product Management Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.products) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.products) && (!adminSearchQuery || "Product Management".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -1963,9 +2659,21 @@ export default function AdminDashboard() {
                   <Package className="h-4.5 w-4.5" /> Product Management
                 </motion.button>
               )}
+
+              {/* Price Analysis Button */}
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.products) && (!adminSearchQuery || "Price Analysis".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                <motion.button
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => changeTab('analysis')}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'analysis' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <TrendingUp className="h-4.5 w-4.5 " /> Price Analysis
+                </motion.button>
+              )}
     
               {/* Categories Banner Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.categoryBanners) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.categoryBanners) && (!adminSearchQuery || "Categories Banner".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -1977,19 +2685,17 @@ export default function AdminDashboard() {
               )}
     
               {/* New Categories Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.categories) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.categories) && (!adminSearchQuery || "Categories".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => changeTab('categories')}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'categories' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
-                  <TrendingUp className="h-4.5 w-4.5" /> Categories
+                  <Layers className="h-4.5 w-4.5" /> Categories
                 </motion.button>
               )}
-    
-              {/* Lookbook Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.lookbook) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.lookbook) && (!adminSearchQuery || "Lookbook".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2001,7 +2707,7 @@ export default function AdminDashboard() {
               )}
     
               {/* Orders Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.orders) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.orders) && (!adminSearchQuery || "Orders".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2013,7 +2719,7 @@ export default function AdminDashboard() {
               )}
     
               {/* Coupons Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.coupons) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.coupons) && (!adminSearchQuery || "Coupons".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2025,7 +2731,7 @@ export default function AdminDashboard() {
               )}
 
               {/* Reviews Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.reviews) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.reviews) && (!adminSearchQuery || "Reviews".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2043,7 +2749,7 @@ export default function AdminDashboard() {
               )}
     
               {/* Slides Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.slides) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.slides) && (!adminSearchQuery || "Slides".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2056,18 +2762,42 @@ export default function AdminDashboard() {
     
               {/* Ads Button */}
               {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.ads) && (
-                <motion.button
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => changeTab('ads')}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'ads' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                  <Megaphone className="h-4.5 w-4.5" /> Ads
-                </motion.button>
+                <>
+                  {(!adminSearchQuery || "Announcements".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                    <motion.button
+                      whileHover={{ x: 4 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => changeTab('announcements')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'announcements' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                      <Bell className="h-4.5 w-4.5" /> Announcements
+                    </motion.button>
+                  )}
+                  {(!adminSearchQuery || "Ads".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                    <motion.button
+                      whileHover={{ x: 4 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => changeTab('ads')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'ads' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                      <Megaphone className="h-4.5 w-4.5" /> Ads
+                    </motion.button>
+                  )}
+                  {(!adminSearchQuery || "Social Media".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                    <motion.button
+                      whileHover={{ x: 4 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => changeTab('socials')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'socials' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                      <Share2 className="h-4.5 w-4.5" /> Social Media
+                    </motion.button>
+                  )}
+                </>
               )}
     
               {/* FAQs Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.faqs) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.faqs) && (!adminSearchQuery || "FAQs".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2079,7 +2809,7 @@ export default function AdminDashboard() {
               )}
     
               {/* Subscribers Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.subscribers) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.subscribers) && (!adminSearchQuery || "Subscribers".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2092,18 +2822,32 @@ export default function AdminDashboard() {
     
               {/* Messages Button */}
               {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.messages) && (
-                <motion.button
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => changeTab('messages')}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'messages' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                  <Mail className="h-4.5 w-4.5" /> Messages
-                </motion.button>
+                <>
+                  {(!adminSearchQuery || "Messages".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                    <motion.button
+                      whileHover={{ x: 4 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => changeTab('messages')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'messages' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                      <Mail className="h-4.5 w-4.5" /> Messages
+                    </motion.button>
+                  )}
+                  {(!adminSearchQuery || "Contact Info".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                    <motion.button
+                      whileHover={{ x: 4 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => changeTab('contactinfo')}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'contactinfo' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                      <Phone className="h-4.5 w-4.5" /> Contact Info
+                    </motion.button>
+                  )}
+                </>
               )}
     
               {/* Policies Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.policies) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.policies) && (!adminSearchQuery || "Policies".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2113,21 +2857,21 @@ export default function AdminDashboard() {
                   <ShieldCheck className="h-4.5 w-4.5" /> Policies
                 </motion.button>
               )}
-
+ 
               {/* OTP List Button */}
-              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.otps) && (
+              {(currentAdmin?.role === 'super' || currentAdmin?.permissions?.otps) && (!adminSearchQuery || "OTP List".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => changeTab('otps')}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'otps' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
-                  <Key className="h-4.5 w-4.5" /> OTP List
+                  <Key className="h-4.5 w-4.5" /> OTPs
                 </motion.button>
               )}
-
+ 
               {/* Manage Admins Button (SUPER ADMIN ONLY) */}
-              {currentAdmin?.role === 'super' && (
+              {currentAdmin?.role === 'super' && (!adminSearchQuery || "Manage Admins".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
                 <motion.button
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
@@ -2141,14 +2885,26 @@ export default function AdminDashboard() {
               {/* Personal Section */}
               <div className="pt-4 mt-4 border-t border-gray-100">
                 <span className="px-4 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">Settings & Profile</span>
-                <motion.button
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => changeTab('profile')}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'profile' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                  <UserCircle className="h-4.5 w-4.5" /> My Profile
-                </motion.button>
+                {currentAdmin?.role === 'super' && (!adminSearchQuery || "Global Settings".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                  <motion.button
+                    whileHover={{ x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => changeTab('settings')}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap mb-1 ${activeTab === 'settings' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    <Settings className="h-4.5 w-4.5" /> Global Settings
+                  </motion.button>
+                )}
+                {(!adminSearchQuery || "My Profile".toLowerCase().includes(adminSearchQuery.toLowerCase())) && (
+                  <motion.button
+                    whileHover={{ x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => changeTab('profile')}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'profile' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    <UserCircle className="h-4.5 w-4.5" /> My Profile
+                  </motion.button>
+                )}
               </div>
             </nav>
             <motion.button 
@@ -2163,7 +2919,7 @@ export default function AdminDashboard() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <div className="flex-1 p-6 md:p-10 hide-scrollbar overflow-auto relative bg-gray-50 dark:bg-gray-950 transition-colors">
+      <div ref={mainScrollRef} className="flex-1 p-6 md:p-10 hide-scrollbar overflow-auto relative bg-gray-50 dark:bg-gray-950 transition-colors">
         {/* Top Header Bar */}
         <div className="flex items-center justify-between gap-4 mb-8">
           {/* Toggle Sidebar Button */}
@@ -3089,6 +3845,13 @@ export default function AdminDashboard() {
                           </div>
                           <div className="space-y-4">
                             <div className="relative">
+                              <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Cost Price (৳) *</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
+                                <input type="number" required className="w-full border border-gray-200 rounded-xl p-3 pl-8 text-black font-black focus:ring-1 focus:ring-black focus:outline-none bg-white transition-colors border-blue-100" value={newProduct.costPrice || ''} onChange={e=>setNewProduct({...newProduct, costPrice: Number(e.target.value)})} placeholder="Original Cost" />
+                              </div>
+                            </div>
+                            <div className="relative">
                               <label className="block text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Selling Price (৳) *</label>
                               <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
@@ -3254,6 +4017,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Name</label><input required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.name} onChange={e=>setEditingProduct({...editingProduct, name: e.target.value})} /></div>
+                <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Cost Price (৳)</label><input type="number" required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors border-blue-100" value={editingProduct.costPrice || 0} onChange={e=>setEditingProduct({...editingProduct, costPrice: Number(e.target.value)})} placeholder="Original Cost" /></div>
                 <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Original Price (৳)</label><input type="number" className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.oldPrice || 0} onChange={e=>setEditingProduct({...editingProduct, oldPrice: Number(e.target.value)})} placeholder="মেইন প্রাইস (ঐচ্ছিক)" /></div>
                 <div><label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Selling Price (৳)</label><input type="number" required className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-1 focus:ring-black focus:outline-none bg-gray-50 focus:bg-white transition-colors" value={editingProduct.price} onChange={e=>setEditingProduct({...editingProduct, price: Number(e.target.value)})} /></div>
                 <div className="md:col-span-2 border border-dashed border-gray-200 rounded-2xl p-4 bg-gray-50/20">
@@ -5588,6 +6352,19 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* Contact Info Tab */}
+        {activeTab === 'contactinfo' && <AdminContactInfoView />}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && <AdminSettingsView />}
+        {activeTab === 'socials' && <AdminSocialLinksView />}
+
+        {/* Announcements Tab */}
+        {activeTab === 'announcements' && <AdminAnnouncementsView />}
+
+        {/* Price Analysis Tab */}
+        {activeTab === 'analysis' && <AdminPriceAnalysisView />}
 
         {/* Ads Tab */}
         {activeTab === 'ads' && (

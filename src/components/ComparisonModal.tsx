@@ -10,6 +10,22 @@ export default function ComparisonModal({ isOpen, onClose }: { isOpen: boolean, 
 
   const selectedProducts = products.filter(p => comparisonItems.includes(p.id));
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.body.style.overflow = 'unset';
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (

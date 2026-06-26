@@ -36,6 +36,38 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Focus search on '/'
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        
+        // If on mobile, mobile menu needs to be open
+        if (window.innerWidth < 768) {
+          setIsMobileMenuOpen(true);
+          // Wait for menu to render
+          setTimeout(() => {
+            const mobileInput = document.getElementById('mobile-search') as HTMLInputElement;
+            if (mobileInput) mobileInput.focus();
+          }, 100);
+        } else {
+          const desktopInput = document.getElementById('desktop-search') as HTMLInputElement;
+          if (desktopInput) desktopInput.focus();
+        }
+      }
+      
+      // Close things on 'Escape'
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        setShowDropdown(false);
+        setIsCartOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -52,7 +84,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-[100] transition-colors">
+    <nav className="bg-white dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 transition-colors">
       <div className="px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto w-full py-4">
         <div className="flex justify-between items-center">
           {/* Logo */}
@@ -74,6 +106,7 @@ export default function Navbar() {
           <div className="hidden md:block flex-1 max-w-md mx-10 relative" ref={searchRef}>
             <form onSubmit={handleSearch}>
               <input
+                id="desktop-search"
                 type="text"
                 placeholder="Search your style..."
                 value={searchQuery}
@@ -209,6 +242,7 @@ export default function Navbar() {
             <div className="px-4 sm:px-6 pt-4 pb-6 space-y-4">
               <form onSubmit={handleSearch} className="relative mb-4">
                 <input
+                  id="mobile-search"
                   type="text"
                   placeholder="Search products..."
                   value={searchQuery}

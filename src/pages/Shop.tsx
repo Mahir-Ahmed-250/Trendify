@@ -17,7 +17,7 @@ export default function Shop() {
   useEffect(() => {
     // Show skeletons on initial load or category change
     setLoading(true);
-    const timer = setTimeout(() => setLoading(false), 800);
+    const timer = setTimeout(() => setLoading(false), 150);
     return () => clearTimeout(timer);
   }, [activeCategory, query]);
 

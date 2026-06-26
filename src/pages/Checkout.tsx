@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ticket, Plus, Minus, Trash2, Loader2 } from 'lucide-react';
+import { Ticket, Plus, Minus, Trash2, Loader2, Download } from 'lucide-react';
 import { useShop } from '../ShopContext';
 import { useToast } from '../components/Toast';
 import { motion } from 'motion/react';
 import SuccessAnimation from '../components/SuccessAnimation';
+import { Order } from '../types';
+import { generateInvoicePDF } from '../lib/invoiceUtils';
 
 const BANGLADESH_DISTRICTS = [
   { en: 'Bagerhat', bn: 'বাগেরহাট' },
@@ -88,7 +90,7 @@ export default function Checkout() {
   const [activeCoupon, setActiveCoupon] = useState<{code: string, discountValue: number, discountType: 'percentage' | 'amount'} | null>(null);
   const [couponCodeInput, setCouponCodeInput] = useState('');
   const [couponError, setCouponError] = useState('');
-  const [orderComplete, setOrderComplete] = useState<{status: boolean, id?: string}>({status: false});
+  const [orderComplete, setOrderComplete] = useState<{status: boolean, order?: Order}>({status: false});
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   useEffect(() => {
@@ -104,7 +106,8 @@ export default function Checkout() {
   const shippingCharge = formData.district === 'Dhaka' ? 70 : 120;
   const total = subtotal - discountAmount + shippingCharge;
 
-  if (orderComplete.status) {
+  if (orderComplete.status && orderComplete.order) {
+    const order = orderComplete.order;
     return (
       <div className="flex-1 w-full max-w-3xl mx-auto px-4 py-20 text-center flex flex-col items-center">
         <SuccessAnimation />
@@ -114,14 +117,26 @@ export default function Checkout() {
         </p>
         <div className="bg-gray-100 px-6 py-4 rounded-xl mb-8 flex flex-col items-center">
           <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Your Order Number</span>
-          <span className="text-2xl font-mono font-bold text-gray-900">{orderComplete.id}</span>
+          <span className="text-2xl font-mono font-bold text-gray-900">{order.id}</span>
         </div>
-        <button
-          onClick={() => navigate('/track-order')}
-          className="bg-black text-white px-8 py-3 rounded-full font-bold hover:bg-gray-800 transition-colors mb-4"
-        >
-          Track Order
-        </button>
+        
+        <div className="flex flex-wrap justify-center gap-4 mb-8">
+          <button
+            onClick={() => generateInvoicePDF(order)}
+            className="bg-black text-white px-8 py-3 rounded-full font-bold hover:bg-gray-800 transition-all active:scale-95 flex items-center gap-2 shadow-lg shadow-black/10"
+          >
+            <Download size={18} />
+            Download Invoice
+          </button>
+          
+          <button
+            onClick={() => navigate('/track-order')}
+            className="bg-white text-black border-2 border-black px-8 py-3 rounded-full font-bold hover:bg-gray-50 transition-all active:scale-95"
+          >
+            Track Order
+          </button>
+        </div>
+
         <button
           onClick={() => navigate('/')}
           className="text-gray-500 text-sm font-bold hover:text-black transition-colors"
@@ -174,12 +189,8 @@ export default function Checkout() {
     const result = placeOrder(customerDetails, activeCoupon?.code);
 
     if (result.success) {
-      addToast('Order placed successfully!', 'success');
-      setOrderComplete({status: true, id: result.orderId});
-
-      // Send invoice in the background
-      const newOrderObj = {
-        id: result.orderId,
+      const newOrderObj: Order = {
+        id: result.orderId!,
         customer: customerDetails,
         items: [...cart],
         subtotal,
@@ -191,6 +202,10 @@ export default function Checkout() {
         status: 'pending'
       };
 
+      addToast('Order placed successfully!', 'success');
+      setOrderComplete({status: true, order: newOrderObj});
+
+      // Send invoice in the background
       fetch('/api/send-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

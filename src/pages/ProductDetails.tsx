@@ -26,6 +26,16 @@ export default function ProductDetails() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  useEffect(() => {
+    if (isSizeModalOpen) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setIsSizeModalOpen(false);
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isSizeModalOpen]);
+
   const shareOnFacebook = () => {
     const url = encodeURIComponent(window.location.href);
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
